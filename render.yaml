@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: excel-analyzer
+    env: docker
+    plan: free
+    region: oregon
