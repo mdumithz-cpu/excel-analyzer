@@ -518,10 +518,10 @@
             uploadFile(file);
         }
 
-        // --- Simulated Upload and Processing ---
+        // --- Upload and Processing ---
         function uploadFile(file) {
-            // Note: In a real app, you would use a proper FormData/fetch call here.
-            // For this single-file example, we simulate the process.
+            const formData = new FormData();
+            formData.append('file', file);
             
             // Show progress and hide upload
             progressSection.style.display = 'block';
@@ -533,10 +533,10 @@
             const progressSteps = [
                 { progress: 10, message: 'Uploading file to server...', log: 'Connection established. Uploading file...' },
                 { progress: 25, message: 'Reading Excel structure...', log: 'File integrity check complete. Parsing workbook sheets...' },
-                { progress: 45, message: 'Filtering alarm data...', log: 'Schema validated. Applying alarm filter rules (Rate > 0.5)...' },
+                { progress: 45, message: 'Filtering alarm data...', log: 'Schema validated. Applying alarm filter rules...' },
                 { progress: 65, message: 'Extracting node information...', log: 'Geospatial data extraction for Node B initiated.' },
                 { progress: 80, message: 'Processing duplicates...', log: 'Identifying and consolidating duplicate entries...' },
-                { progress: 95, message: 'Finalizing output table...', log: 'Data serialization to final output format (CSV/Excel).' },
+                { progress: 95, message: 'Finalizing output table...', log: 'Data serialization to final output format.' },
                 { progress: 100, message: 'Complete!', log: 'Process finished successfully.', final: true }
             ];
 
@@ -547,22 +547,42 @@
                     progressFill.style.width = step.progress + '%';
                     progressStatus.textContent = step.message;
                     updateLog(step.log, step.final ? 'success' : 'info');
-                    
-                    if (step.final) {
-                        clearInterval(progressInterval);
-                        setTimeout(() => {
-                            // Simulate successful data object (removed stats keys as UI no longer uses them)
-                            const dummyData = {
-                                success: true,
-                                download_url: '#', // Placeholder URL
-                                message: 'Extraction completed successfully. Ready for download.',
-                            };
-                            showDownloadSection(dummyData);
-                        }, 500);
-                    }
                     stepIndex++;
                 }
             }, 800);
+
+            // Send actual request to Flask server
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                
+                if (data.success) {
+                    updateLog('Server processing completed successfully!', 'success');
+                    showDownloadSection(data);
+                } else {
+                    updateLog(`ERROR: ${data.error}`, 'error');
+                    showStatus(data.error, 'error');
+                    resetUploadSection();
+                }
+                setProcessingState(false);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                updateLog(`NETWORK ERROR: ${error.message}`, 'error');
+                showStatus('Network error: ' + error.message, 'error');
+                resetUploadSection();
+                setProcessingState(false);
+            });
+        }
+
+        function resetUploadSection() {
+            progressSection.style.display = 'none';
+            uploadSection.style.display = 'block';
+            fileInfo.style.display = 'none';
         }
 
         // --- Download and Stats Section ---
