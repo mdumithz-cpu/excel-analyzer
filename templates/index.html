@@ -528,6 +528,13 @@
             uploadSection.style.display = 'none';
             setProcessingState(true);
 
+            // Auto-scroll to show the progress section and log
+            setTimeout(() => {
+                progressSection.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }, 100);
             
             // Enhanced progress simulation with log updates
             const progressSteps = [
