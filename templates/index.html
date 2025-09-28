@@ -594,15 +594,28 @@
 
         // --- Download and Stats Section ---
         function showDownloadSection(data) {
-            progressSection.style.display = 'none';
+            // Keep progress section visible to show final logs
+            // Don't hide it immediately - let user see completion
             downloadSection.style.display = 'block';
-            duplicateWarning.style.display = 'block'; // Show the new warning
+            duplicateWarning.style.display = 'block';
             downloadBtn.href = data.download_url;
             setProcessingState(false);
 
-            // Removed statistics update logic here as per user request
-
+            // Show success message
             showStatus(data.message, 'success');
+
+            // Scroll to download section after a brief delay
+            setTimeout(() => {
+                downloadSection.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }, 2000);
+
+            // Hide progress section after user has time to see final logs
+            setTimeout(() => {
+                progressSection.style.display = 'none';
+            }, 5000);
         }
 
         function showStatus(message, type) {
