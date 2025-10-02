@@ -15,7 +15,6 @@
         
         body {
             font-family: 'Inter', sans-serif;
-            /* Professional Dark Background */
             background: linear-gradient(135deg, #101520 0%, #080a10 100%);
             min-height: 100vh;
             padding: 30px;
@@ -23,7 +22,6 @@
             color: #e0e0e0;
         }
         
-        /* Subtle Grid and Glow for dynamic feel */
         body::after {
             content: '';
             position: fixed;
@@ -42,7 +40,7 @@
         .container {
             max-width: 950px;
             margin: 0 auto;
-            background: rgba(18, 24, 35, 0.95); /* Deeper, less transparent */
+            background: rgba(18, 24, 35, 0.95);
             border-radius: 12px;
             box-shadow: 
                 0 10px 40px rgba(0, 0, 0, 0.5),
@@ -53,13 +51,11 @@
         }
         
         .header {
-            /* Muted, professional gradient */
             background: linear-gradient(135deg, 
                 rgba(20, 30, 50, 1) 0%, 
                 rgba(30, 40, 70, 1) 100%);
             color: #ffffff;
             padding: 30px 40px;
-            /* Centered titles */
             text-align: center; 
             border-bottom: 2px solid #00bfff;
         }
@@ -69,7 +65,6 @@
             font-size: 2.2em;
             font-weight: 900;
             margin-bottom: 5px;
-            /* Use a professional primary color */
             color: #00bfff; 
             text-shadow: 0 0 5px rgba(0, 190, 255, 0.5);
         }
@@ -140,6 +135,99 @@
             box-shadow: 0 4px 15px rgba(0, 190, 255, 0.4);
             transform: scale(1.02);
         }
+
+        /* Date/Time Filter Section */
+        .filter-section {
+            background: #202838;
+            border: 1px solid #405070;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .filter-title {
+            font-size: 1.1em;
+            color: #00bfff;
+            font-weight: 600;
+        }
+
+        .filter-toggle {
+            background: #405070;
+            color: #fff;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .filter-toggle:hover {
+            background: #506080;
+        }
+
+        .filter-content {
+            display: none;
+        }
+
+        .filter-content.active {
+            display: block;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            color: #a0a0a0;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .filter-group input[type="date"],
+        .filter-group input[type="time"] {
+            background: #181d28;
+            border: 1px solid #405070;
+            border-radius: 5px;
+            padding: 10px;
+            color: #e0e0e0;
+            font-size: 0.95em;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .filter-group input[type="date"]:focus,
+        .filter-group input[type="time"]:focus {
+            outline: none;
+            border-color: #00bfff;
+            box-shadow: 0 0 5px rgba(0, 190, 255, 0.3);
+        }
+
+        .filter-info {
+            background: rgba(0, 190, 255, 0.1);
+            border-left: 3px solid #00bfff;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: #a0a0a0;
+        }
         
         .warning-note {
             background: rgba(255, 150, 0, 0.1);
@@ -160,7 +248,7 @@
             color: #ff4444;
             font-size: 0.95em;
             font-weight: 500;
-            display: none; /* Controlled by JS */
+            display: none;
         }
         
         .file-info {
@@ -226,7 +314,6 @@
             font-weight: 400;
         }
 
-        /* New Log Styling */
         .processing-log {
             height: 150px;
             background: #181d28;
@@ -237,7 +324,7 @@
             overflow-y: auto;
             font-family: monospace;
             font-size: 0.9em;
-            color: #00ffaa; /* Green/cyan text for logs */
+            color: #00ffaa;
             white-space: pre-wrap;
             line-height: 1.4;
             box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
@@ -317,8 +404,6 @@
             box-shadow: 0 5px 20px rgba(0, 255, 170, 0.4);
             background: linear-gradient(135deg, #00ffcc 0%, #00e5ff 100%);
         }
-        
-        /* Removed .stats-grid and .stat-card CSS as they are no longer used */
 
         .format-info {
             background: #151a24;
@@ -361,7 +446,10 @@
             .header h1 {
                 font-size: 1.8em;
             }
-            /* Removed .stats-grid media query adjustment */
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -369,9 +457,8 @@
     <div class="container">
         <div class="header">
             <h1>Rate Alarm Extractor</h1>
-            <!-- Change 1: Updated subheading text and centered titles (via .header CSS) -->
             <p>Created by Dumith.D - © All rights reserved 2025</p>
-			<p>dumith@live.com</p>
+            <p>dumith@live.com</p>
         </div>
         
         <div class="content">
@@ -385,6 +472,37 @@
                 <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
                     Select Data File
                 </button>
+            </div>
+
+            <!-- Date/Time Filter Section -->
+            <div class="filter-section">
+                <div class="filter-header" onclick="toggleFilter()">
+                    <div class="filter-title">🕒 Shift Time Filter (Optional)</div>
+                    <button class="filter-toggle" id="filterToggle">Show</button>
+                </div>
+                <div class="filter-content" id="filterContent">
+                    <div class="filter-grid">
+                        <div class="filter-group">
+                            <label for="shiftInDate">Shift In Date</label>
+                            <input type="date" id="shiftInDate" name="shift_in_date">
+                        </div>
+                        <div class="filter-group">
+                            <label for="shiftInTime">Shift In Time</label>
+                            <input type="time" id="shiftInTime" name="shift_in_time">
+                        </div>
+                        <div class="filter-group">
+                            <label for="shiftOutDate">Shift Out Date</label>
+                            <input type="date" id="shiftOutDate" name="shift_out_date">
+                        </div>
+                        <div class="filter-group">
+                            <label for="shiftOutTime">Shift Out Time</label>
+                            <input type="time" id="shiftOutTime" name="shift_out_time">
+                        </div>
+                    </div>
+                    <div class="filter-info">
+                        ℹ️ Leave empty to process all alarms. Fill all fields to filter alarms by shift duration.
+                    </div>
+                </div>
             </div>
             
             <div class="file-info" id="fileInfo">
@@ -401,7 +519,6 @@
                     <div class="progress-status" id="progressStatus">Initializing...</div>
                 </div>
 
-                <!-- Dynamically updating log added here -->
                 <div class="processing-log" id="processingLog">
                     Waiting for file upload...
                 </div>
@@ -412,15 +529,11 @@
             <div class="download-section" id="downloadSection">
                 <h3>✅ Data Extraction Complete!</h3>
                 
-                <!-- Success GIF -->
                 <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMnhkb3h4OHFkb3pmcmFnamJ1aGp3Y3NhbmxkcnVsdG5pdHk0em1jeSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TaYmMYLtP0RvpDzgn4/giphy.gif" 
                      alt="Success Animation" 
                      class="success-gif" 
                      id="successGif">
                 
-                <!-- Change 3: Removed the stats-grid div entirely. Content now flows directly. -->
-
-                <!-- Change 4: Updated warning text (Action Required -> Caution) -->
                 <div class="download-warning-note" id="duplicateWarning">
                     ⚠️ Caution: Double-check the output file for duplicates before distribution.
                 </div>
@@ -457,11 +570,19 @@
         const processingLog = document.getElementById('processingLog');
         const duplicateWarning = document.getElementById('duplicateWarning');
 
-        /**
-         * Dynamically adds a new line to the processing log.
-         * @param {string} message - The log text.
-         * @param {('info'|'error'|'success')} type - The type of log entry for styling.
-         */
+        // Filter elements
+        const filterContent = document.getElementById('filterContent');
+        const filterToggle = document.getElementById('filterToggle');
+        const shiftInDate = document.getElementById('shiftInDate');
+        const shiftInTime = document.getElementById('shiftInTime');
+        const shiftOutDate = document.getElementById('shiftOutDate');
+        const shiftOutTime = document.getElementById('shiftOutTime');
+
+        function toggleFilter() {
+            filterContent.classList.toggle('active');
+            filterToggle.textContent = filterContent.classList.contains('active') ? 'Hide' : 'Show';
+        }
+
         function updateLog(message, type = 'info') {
             const now = new Date();
             const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -471,11 +592,10 @@
             logEntry.textContent = `[${timeString}] ${message}`;
 
             processingLog.appendChild(logEntry);
-            // Scroll to the bottom to show the latest entry
             processingLog.scrollTop = processingLog.scrollHeight;
         }
 
-        // --- Drag and Drop / Input Handling ---
+        // Drag and Drop
         uploadSection.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadSection.classList.add('dragover');
@@ -503,44 +623,58 @@
         });
 
         function handleFile(file) {
-            // Reset log display
             processingLog.innerHTML = '';
             updateLog(`File selected: ${file.name}`, 'info');
 
-            // Validate file type
             if (!file.name.toLowerCase().match(/\.(xlsx|xls)$/)) {
                 showStatus('Please select a valid Excel file (.xlsx or .xls)', 'error');
                 updateLog('ERROR: Invalid file format detected.', 'error');
                 return;
             }
 
-            // Validate file size (16MB limit)
             if (file.size > 16 * 1024 * 1024) {
                 showStatus('File size exceeds 16MB limit. Please select a smaller file.', 'error');
                 updateLog('ERROR: File size limit exceeded (16MB).', 'error');
                 return;
             }
 
-            // Show file info
             fileName.textContent = file.name;
             fileSize.textContent = formatFileSize(file.size);
             fileInfo.style.display = 'block';
 
-            // Start upload and processing
             uploadFile(file);
         }
 
-        // --- Upload and Processing ---
         function uploadFile(file) {
             const formData = new FormData();
             formData.append('file', file);
+
+            // Add date/time filters if provided
+            const shiftInDateVal = shiftInDate.value;
+            const shiftInTimeVal = shiftInTime.value;
+            const shiftOutDateVal = shiftOutDate.value;
+            const shiftOutTimeVal = shiftOutTime.value;
+
+            // Validate: either all fields filled or all empty
+            const filterFieldsFilled = [shiftInDateVal, shiftInTimeVal, shiftOutDateVal, shiftOutTimeVal].filter(v => v).length;
+            if (filterFieldsFilled > 0 && filterFieldsFilled < 4) {
+                showStatus('Please fill all shift time fields or leave all empty', 'error');
+                updateLog('ERROR: Incomplete shift time filter.', 'error');
+                return;
+            }
+
+            if (filterFieldsFilled === 4) {
+                formData.append('shift_in_date', shiftInDateVal);
+                formData.append('shift_in_time', shiftInTimeVal);
+                formData.append('shift_out_date', shiftOutDateVal);
+                formData.append('shift_out_time', shiftOutTimeVal);
+                updateLog(`Applying shift filter: ${shiftInDateVal} ${shiftInTimeVal} to ${shiftOutDateVal} ${shiftOutTimeVal}`, 'info');
+            }
             
-            // Show progress and hide upload
             progressSection.style.display = 'block';
             uploadSection.style.display = 'none';
             setProcessingState(true);
 
-            // Auto-scroll to show the progress section and log
             setTimeout(() => {
                 progressSection.scrollIntoView({ 
                     behavior: 'smooth', 
@@ -548,7 +682,6 @@
                 });
             }, 100);
             
-            // Enhanced progress simulation with log updates
             const progressSteps = [
                 { progress: 10, message: 'Uploading file to server...', log: 'Connection established. Uploading file...' },
                 { progress: 25, message: 'Reading Excel structure...', log: 'File integrity check complete. Parsing workbook sheets...' },
@@ -570,7 +703,6 @@
                 }
             }, 800);
 
-            // Send actual request to Flask server
             fetch('/upload', {
                 method: 'POST',
                 body: formData
@@ -604,19 +736,14 @@
             fileInfo.style.display = 'none';
         }
 
-        // --- Download and Stats Section ---
         function showDownloadSection(data) {
-            // Keep progress section visible to show final logs
-            // Don't hide it immediately - let user see completion
             downloadSection.style.display = 'block';
             duplicateWarning.style.display = 'block';
             downloadBtn.href = data.download_url;
             setProcessingState(false);
 
-            // Show success message
             showStatus(data.message, 'success');
 
-            // Scroll to download section after a brief delay
             setTimeout(() => {
                 downloadSection.scrollIntoView({ 
                     behavior: 'smooth', 
@@ -624,7 +751,6 @@
                 });
             }, 2000);
 
-            // Hide progress section after user has time to see final logs
             setTimeout(() => {
                 progressSection.style.display = 'none';
             }, 5000);
@@ -642,9 +768,7 @@
             }
         }
 
-        // --- Utility Functions ---
         function resetApp() {
-            // Reset all sections
             uploadSection.style.display = 'block';
             fileInfo.style.display = 'none';
             progressSection.style.display = 'none';
@@ -653,8 +777,12 @@
             duplicateWarning.style.display = 'none';
             processingLog.textContent = 'Waiting for file upload...';
             
-            // Clear file input
             fileInput.value = '';
+            shiftInDate.value = '';
+            shiftInTime.value = '';
+            shiftOutDate.value = '';
+            shiftOutTime.value = '';
+            
             setProcessingState(false);
         }
 
@@ -673,13 +801,9 @@
             processingInProgress = processing;
         }
         
-        // Initial setup for reset
         document.addEventListener('DOMContentLoaded', function() {
              resetApp();
         });
     </script>
 </body>
 </html>
-
-
-
