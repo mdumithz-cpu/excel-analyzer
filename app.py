@@ -421,6 +421,12 @@ def upload_file():
             # Save uploaded file
             file.save(filepath)
             
+            # Get filter parameters from request
+            shift_in_date = request.form.get('shift_in_date', '')
+            shift_in_time = request.form.get('shift_in_time', '')
+            shift_out_date = request.form.get('shift_out_date', '')
+            shift_out_time = request.form.get('shift_out_time', '')
+            
             # Process the Excel file
             processor = ExcelProcessor()
             
@@ -435,6 +441,32 @@ def upload_file():
             if error:
                 os.remove(filepath)  # Clean up
                 return jsonify({'success': False, 'error': f'Error processing data: {error}'})
+            
+            # Step 2.5: Apply date/time filtering if provided
+            if shift_in_date and shift_in_time and shift_out_date and shift_out_time:
+                try:
+                    shift_in_datetime = pd.to_datetime(f"{shift_in_date} {shift_in_time}")
+                    shift_out_datetime = pd.to_datetime(f"{shift_out_date} {shift_out_time}")
+                    
+                    if 'Arrived On (ST)' in filtered_data.columns:
+                        # Ensure datetime format
+                        filtered_data['Arrived On (ST)'] = pd.to_datetime(filtered_data['Arrived On (ST)'], errors='coerce')
+                        
+                        # Filter by date range
+                        before_filter = len(filtered_data)
+                        filtered_data = filtered_data[
+                            (filtered_data['Arrived On (ST)'] >= shift_in_datetime) & 
+                            (filtered_data['Arrived On (ST)'] <= shift_out_datetime)
+                        ]
+                        after_filter = len(filtered_data)
+                        
+                        if len(filtered_data) == 0:
+                            os.remove(filepath)
+                            return jsonify({'success': False, 'error': f'No alarms found between {shift_in_datetime} and {shift_out_datetime}'})
+                        
+                except Exception as e:
+                    os.remove(filepath)
+                    return jsonify({'success': False, 'error': f'Error applying date filter: {str(e)}'})
             
             # Step 3: Create output table
             output_table, error = processor.create_output_table(filtered_data)
@@ -451,10 +483,15 @@ def upload_file():
             # Clean up input file
             os.remove(filepath)
             
+            # Build success message
+            message = f'File processed successfully! {len(output_table)} rows generated.'
+            if shift_in_date and shift_out_date:
+                message += f' Filtered from {shift_in_date} {shift_in_time} to {shift_out_date} {shift_out_time}.'
+            
             # Return success with download link
             return jsonify({
                 'success': True, 
-                'message': f'File processed successfully! {len(output_table)} rows generated.',
+                'message': message,
                 'download_url': url_for('download_file', filename=output_filename),
                 'filename': output_filename,
                 'stats': {
