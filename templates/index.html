@@ -181,7 +181,7 @@
         }
 
         .filter-group input[type="date"],
-        .filter-group input[type="time"] { /* Reverted back to type="time" styling */
+        .filter-group input[type="time"] {
             background: #181d28;
             border: 1px solid #405070;
             border-radius: 5px;
@@ -192,14 +192,14 @@
         }
 
         .filter-group input[type="date"]:focus,
-        .filter-group input[type="time"]:focus { /* Reverted back to type="time" styling */
+        .filter-group input[type="time"]:focus {
             outline: none;
             border-color: #00bfff;
             box-shadow: 0 0 5px rgba(0, 190, 255, 0.3);
         }
 
         .filter-group input[type="date"]:invalid,
-        .filter-group input[type="time"]:invalid { /* Reverted back to type="time" styling */
+        .filter-group input[type="time"]:invalid {
             border-color: #ff4444;
         }
 
@@ -486,8 +486,7 @@
                             <input type="date" id="shiftInDate" name="shift_in_date" required>
                         </div>
                         <div class="filter-group">
-                            <label for="shiftInTime">Shift In Time (12hr) *</label>
-                            <!-- REVERT: Changed type back to 'time' -->
+                            <label for="shiftInTime">Shift In Time (24hr) *</label>
                             <input type="time" id="shiftInTime" name="shift_in_time" step="60" required>
                         </div>
                     </div>
@@ -497,8 +496,7 @@
                             <input type="date" id="shiftOutDate" name="shift_out_date" required>
                         </div>
                         <div class="filter-group">
-                            <label for="shiftOutTime">Shift Out Time (12hr) *</label>
-                            <!-- REVERT: Changed type back to 'time' -->
+                            <label for="shiftOutTime">Shift Out Time (24hr) *</label>
                             <input type="time" id="shiftOutTime" name="shift_out_time" step="60" required>
                         </div>
                     </div>
@@ -593,29 +591,16 @@
         const shiftOutDate = document.getElementById('shiftOutDate');
         const shiftOutTime = document.getElementById('shiftOutTime');
 
-        /**
-         * Validates the shift duration inputs.
-         */
+        // Validate shift duration inputs
         function validateShiftDuration() {
-            // Check if all inputs are filled 
             const allFilled = shiftInDate.value && shiftInTime.value && 
                              shiftOutDate.value && shiftOutTime.value;
             
-            // Check validity (which browser handles for type="time")
-            const allValid = shiftInTime.checkValidity() && shiftOutTime.checkValidity();
-
-            if (allFilled && allValid) {
+            if (allFilled) {
                 // Check if shift out is after shift in
-                // We construct Date objects using the date and the HH:MM text value (which is still 24hr behind the scenes for type="time")
                 const shiftIn = new Date(`${shiftInDate.value}T${shiftInTime.value}`);
                 const shiftOut = new Date(`${shiftOutDate.value}T${shiftOutTime.value}`);
                 
-                // Ensure dates are valid Date objects (i.e., not 'Invalid Date')
-                if (isNaN(shiftIn.getTime()) || isNaN(shiftOut.getTime())) {
-                    proceedBtn.disabled = true;
-                    return false;
-                }
-
                 if (shiftOut > shiftIn) {
                     proceedBtn.disabled = false;
                     return true;
@@ -648,20 +633,9 @@
             }
         });
 
-        /**
-         * Updates the processing log with a timestamped message.
-         * Using 'en-US' default (which is usually 12-hour format with AM/PM) for logging.
-         */
         function updateLog(message, type = 'info') {
             const now = new Date();
-            // REVERT: Using default locale options (or specifying 'en-US') 
-            // for standard 12-hour logging format.
-            const timeString = now.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit'
-                // Removed hourCycle: 'h23'
-            });
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry ${type}`;
@@ -769,28 +743,31 @@
                 }
             }, 800);
 
-            // *** START Mock Simulation for Canvas Preview ***
-            setTimeout(() => {
-                 // Simulate successful response after a delay
-                 const mockResponse = {
-                     success: true,
-                     message: 'Filtering completed. 5,123 alarms processed and filtered.',
-                     download_url: '#mock-download-link'
-                 };
-                 
-                 clearInterval(progressInterval);
-                 
-                 if (mockResponse.success) {
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                
+                if (data.success) {
                     updateLog('Server processing completed successfully!', 'success');
-                    showDownloadSection(mockResponse);
+                    showDownloadSection(data);
                 } else {
-                    updateLog(`ERROR: ${mockResponse.error || 'Unknown error occurred.'}`, 'error');
-                    showStatus(mockResponse.error || 'Processing failed.', 'error');
+                    updateLog(`ERROR: ${data.error}`, 'error');
+                    showStatus(data.error, 'error');
                     resetUploadSection();
                 }
                 setProcessingState(false);
-            }, 5000); 
-            // *** END Mock Simulation ***
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                updateLog(`NETWORK ERROR: ${error.message}`, 'error');
+                showStatus('Network error: ' + error.message, 'error');
+                resetUploadSection();
+                setProcessingState(false);
+            });
         }
 
         function resetUploadSection() {
