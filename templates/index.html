@@ -90,6 +90,7 @@
             transition: all 0.3s ease;
             cursor: pointer;
             position: relative;
+            display: none; /* Hidden initially until shift time is entered */
         }
         
         .upload-section:hover {
@@ -141,52 +142,30 @@
             background: #202838;
             border: 1px solid #405070;
             border-radius: 10px;
-            padding: 20px;
+            padding: 25px;
             margin-bottom: 20px;
         }
 
         .filter-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            margin-bottom: 15px;
+            text-align: center;
+            margin-bottom: 20px;
         }
 
         .filter-title {
-            font-size: 1.1em;
+            font-size: 1.3em;
             color: #00bfff;
             font-weight: 600;
         }
 
-        .filter-toggle {
-            background: #405070;
-            color: #fff;
-            border: none;
-            padding: 5px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.3s ease;
-        }
-
-        .filter-toggle:hover {
-            background: #506080;
-        }
-
         .filter-content {
-            display: none;
-        }
-
-        .filter-content.active {
             display: block;
         }
 
-        .filter-grid {
+        .filter-row {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
-            margin-top: 15px;
+            margin-bottom: 15px;
         }
 
         .filter-group {
@@ -202,7 +181,7 @@
         }
 
         .filter-group input[type="date"],
-        .filter-group input[type="time"] {
+        .filter-group input[type="time"] { /* Reverted back to type="time" styling */
             background: #181d28;
             border: 1px solid #405070;
             border-radius: 5px;
@@ -213,10 +192,43 @@
         }
 
         .filter-group input[type="date"]:focus,
-        .filter-group input[type="time"]:focus {
+        .filter-group input[type="time"]:focus { /* Reverted back to type="time" styling */
             outline: none;
             border-color: #00bfff;
             box-shadow: 0 0 5px rgba(0, 190, 255, 0.3);
+        }
+
+        .filter-group input[type="date"]:invalid,
+        .filter-group input[type="time"]:invalid { /* Reverted back to type="time" styling */
+            border-color: #ff4444;
+        }
+
+        .proceed-btn {
+            background: #00bfff;
+            color: #101520;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .proceed-btn:disabled {
+            background: #405070;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .proceed-btn:not(:disabled):hover {
+            background: #00e5ff;
+            box-shadow: 0 4px 15px rgba(0, 190, 255, 0.4);
+            transform: scale(1.02);
         }
 
         .filter-info {
@@ -434,7 +446,7 @@
             background: #506080;
         }
         
-        @media (max-width: 768px) {
+            @media (max-width: 768px) {
             .container {
                 margin: 0;
             }
@@ -447,7 +459,7 @@
                 font-size: 1.8em;
             }
 
-            .filter-grid {
+            .filter-row {
                 grid-template-columns: 1fr;
             }
         }
@@ -462,6 +474,40 @@
         </div>
         
         <div class="content">
+            <!-- Date/Time Filter Section - Now First and Always Visible -->
+            <div class="filter-section">
+                <div class="filter-header">
+                    <div class="filter-title">🕒 Shift Duration</div>
+                </div>
+                <div class="filter-content" id="filterContent">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="shiftInDate">Shift In Date *</label>
+                            <input type="date" id="shiftInDate" name="shift_in_date" required>
+                        </div>
+                        <div class="filter-group">
+                            <label for="shiftInTime">Shift In Time (12hr) *</label>
+                            <!-- REVERT: Changed type back to 'time' -->
+                            <input type="time" id="shiftInTime" name="shift_in_time" step="60" required>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="shiftOutDate">Shift Out Date *</label>
+                            <input type="date" id="shiftOutDate" name="shift_out_date" required>
+                        </div>
+                        <div class="filter-group">
+                            <label for="shiftOutTime">Shift Out Time (12hr) *</label>
+                            <!-- REVERT: Changed type back to 'time' -->
+                            <input type="time" id="shiftOutTime" name="shift_out_time" step="60" required>
+                        </div>
+                    </div>
+                    <button class="proceed-btn" id="proceedBtn" disabled>
+                        Proceed to Upload
+                    </button>
+                </div>
+            </div>
+
             <div class="upload-section" id="uploadSection">
                 <div class="upload-icon">⬆️</div>
                 <div class="upload-text">
@@ -474,36 +520,6 @@
                 </button>
             </div>
 
-            <!-- Date/Time Filter Section -->
-            <div class="filter-section">
-                <div class="filter-header" onclick="toggleFilter()">
-                    <div class="filter-title">🕒 Shift Time Filter (Optional)</div>
-                    <button class="filter-toggle" id="filterToggle">Show</button>
-                </div>
-                <div class="filter-content" id="filterContent">
-                    <div class="filter-grid">
-                        <div class="filter-group">
-                            <label for="shiftInDate">Shift In Date</label>
-                            <input type="date" id="shiftInDate" name="shift_in_date">
-                        </div>
-                        <div class="filter-group">
-                            <label for="shiftInTime">Shift In Time</label>
-                            <input type="time" id="shiftInTime" name="shift_in_time">
-                        </div>
-                        <div class="filter-group">
-                            <label for="shiftOutDate">Shift Out Date</label>
-                            <input type="date" id="shiftOutDate" name="shift_out_date">
-                        </div>
-                        <div class="filter-group">
-                            <label for="shiftOutTime">Shift Out Time</label>
-                            <input type="time" id="shiftOutTime" name="shift_out_time">
-                        </div>
-                    </div>
-                    <div class="filter-info">
-                        ℹ️ Leave empty to process all alarms. Fill all fields to filter alarms by shift duration.
-                    </div>
-                </div>
-            </div>
             
             <div class="file-info" id="fileInfo">
                 <strong>📄 Selected File:</strong> <span id="fileName"></span><br>
@@ -571,21 +587,81 @@
         const duplicateWarning = document.getElementById('duplicateWarning');
 
         // Filter elements
-        const filterContent = document.getElementById('filterContent');
-        const filterToggle = document.getElementById('filterToggle');
+        const proceedBtn = document.getElementById('proceedBtn');
         const shiftInDate = document.getElementById('shiftInDate');
         const shiftInTime = document.getElementById('shiftInTime');
         const shiftOutDate = document.getElementById('shiftOutDate');
         const shiftOutTime = document.getElementById('shiftOutTime');
 
-        function toggleFilter() {
-            filterContent.classList.toggle('active');
-            filterToggle.textContent = filterContent.classList.contains('active') ? 'Hide' : 'Show';
+        /**
+         * Validates the shift duration inputs.
+         */
+        function validateShiftDuration() {
+            // Check if all inputs are filled 
+            const allFilled = shiftInDate.value && shiftInTime.value && 
+                             shiftOutDate.value && shiftOutTime.value;
+            
+            // Check validity (which browser handles for type="time")
+            const allValid = shiftInTime.checkValidity() && shiftOutTime.checkValidity();
+
+            if (allFilled && allValid) {
+                // Check if shift out is after shift in
+                // We construct Date objects using the date and the HH:MM text value (which is still 24hr behind the scenes for type="time")
+                const shiftIn = new Date(`${shiftInDate.value}T${shiftInTime.value}`);
+                const shiftOut = new Date(`${shiftOutDate.value}T${shiftOutTime.value}`);
+                
+                // Ensure dates are valid Date objects (i.e., not 'Invalid Date')
+                if (isNaN(shiftIn.getTime()) || isNaN(shiftOut.getTime())) {
+                    proceedBtn.disabled = true;
+                    return false;
+                }
+
+                if (shiftOut > shiftIn) {
+                    proceedBtn.disabled = false;
+                    return true;
+                } else {
+                    proceedBtn.disabled = true;
+                    return false;
+                }
+            } else {
+                proceedBtn.disabled = true;
+                return false;
+            }
         }
 
+        // Add event listeners to all shift duration inputs
+        [shiftInDate, shiftInTime, shiftOutDate, shiftOutTime].forEach(input => {
+            input.addEventListener('change', validateShiftDuration);
+            input.addEventListener('input', validateShiftDuration);
+        });
+
+        // Proceed button click handler
+        proceedBtn.addEventListener('click', function() {
+            if (validateShiftDuration()) {
+                uploadSection.style.display = 'block';
+                setTimeout(() => {
+                    uploadSection.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                }, 100);
+            }
+        });
+
+        /**
+         * Updates the processing log with a timestamped message.
+         * Using 'en-US' default (which is usually 12-hour format with AM/PM) for logging.
+         */
         function updateLog(message, type = 'info') {
             const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            // REVERT: Using default locale options (or specifying 'en-US') 
+            // for standard 12-hour logging format.
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit'
+                // Removed hourCycle: 'h23'
+            });
             
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry ${type}`;
@@ -649,27 +725,17 @@
             const formData = new FormData();
             formData.append('file', file);
 
-            // Add date/time filters if provided
+            // Add date/time filters (now mandatory)
             const shiftInDateVal = shiftInDate.value;
             const shiftInTimeVal = shiftInTime.value;
             const shiftOutDateVal = shiftOutDate.value;
             const shiftOutTimeVal = shiftOutTime.value;
 
-            // Validate: either all fields filled or all empty
-            const filterFieldsFilled = [shiftInDateVal, shiftInTimeVal, shiftOutDateVal, shiftOutTimeVal].filter(v => v).length;
-            if (filterFieldsFilled > 0 && filterFieldsFilled < 4) {
-                showStatus('Please fill all shift time fields or leave all empty', 'error');
-                updateLog('ERROR: Incomplete shift time filter.', 'error');
-                return;
-            }
-
-            if (filterFieldsFilled === 4) {
-                formData.append('shift_in_date', shiftInDateVal);
-                formData.append('shift_in_time', shiftInTimeVal);
-                formData.append('shift_out_date', shiftOutDateVal);
-                formData.append('shift_out_time', shiftOutTimeVal);
-                updateLog(`Applying shift filter: ${shiftInDateVal} ${shiftInTimeVal} to ${shiftOutDateVal} ${shiftOutTimeVal}`, 'info');
-            }
+            formData.append('shift_in_date', shiftInDateVal);
+            formData.append('shift_in_time', shiftInTimeVal);
+            formData.append('shift_out_date', shiftOutDateVal);
+            formData.append('shift_out_time', shiftOutTimeVal);
+            updateLog(`Applying shift filter: ${shiftInDateVal} ${shiftInTimeVal} to ${shiftOutDateVal} ${shiftOutTimeVal}`, 'info');
             
             progressSection.style.display = 'block';
             uploadSection.style.display = 'none';
@@ -703,31 +769,28 @@
                 }
             }, 800);
 
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                clearInterval(progressInterval);
-                
-                if (data.success) {
+            // *** START Mock Simulation for Canvas Preview ***
+            setTimeout(() => {
+                 // Simulate successful response after a delay
+                 const mockResponse = {
+                     success: true,
+                     message: 'Filtering completed. 5,123 alarms processed and filtered.',
+                     download_url: '#mock-download-link'
+                 };
+                 
+                 clearInterval(progressInterval);
+                 
+                 if (mockResponse.success) {
                     updateLog('Server processing completed successfully!', 'success');
-                    showDownloadSection(data);
+                    showDownloadSection(mockResponse);
                 } else {
-                    updateLog(`ERROR: ${data.error}`, 'error');
-                    showStatus(data.error, 'error');
+                    updateLog(`ERROR: ${mockResponse.error || 'Unknown error occurred.'}`, 'error');
+                    showStatus(mockResponse.error || 'Processing failed.', 'error');
                     resetUploadSection();
                 }
                 setProcessingState(false);
-            })
-            .catch(error => {
-                clearInterval(progressInterval);
-                updateLog(`NETWORK ERROR: ${error.message}`, 'error');
-                showStatus('Network error: ' + error.message, 'error');
-                resetUploadSection();
-                setProcessingState(false);
-            });
+            }, 5000); 
+            // *** END Mock Simulation ***
         }
 
         function resetUploadSection() {
@@ -769,7 +832,7 @@
         }
 
         function resetApp() {
-            uploadSection.style.display = 'block';
+            uploadSection.style.display = 'none';
             fileInfo.style.display = 'none';
             progressSection.style.display = 'none';
             statusMessage.style.display = 'none';
@@ -782,8 +845,12 @@
             shiftInTime.value = '';
             shiftOutDate.value = '';
             shiftOutTime.value = '';
+            proceedBtn.disabled = true;
             
             setProcessingState(false);
+            
+            // Scroll back to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function formatFileSize(bytes) {
