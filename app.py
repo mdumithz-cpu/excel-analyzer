@@ -142,78 +142,59 @@ class ExcelProcessor:
         
         return None
     
- 
     @staticmethod
-def extract_node_b(location_info):
-    """Extract Node B from Location Info (text after "To" or "to" until "=" or end of string)
-    Then clean by removing text after dashes, hashes, or opening parenthesis"""
-    if pd.isna(location_info):
-        return ""
+    def extract_node_b(location_info):
+        """Extract Node B from Location Info (text after "To" or "to" until "=" or end of string)
+        Then clean by removing text after dashes, hashes, or opening parenthesis"""
+        if pd.isna(location_info):
+            return ""
 
-    location_str = str(location_info)
-    node_b = ""
+        location_str = str(location_info)
+        node_b = ""
 
-    # New Pattern 1: Extract pattern like "GQ_X16_CEA" from "10G_LINK1_TO_GQ_X16_CEA"
-    # This handles formats like: "--- 10G_LINK1_TO_GQ_X16_CEA ---"
-    pattern_new1 = r'TO[_\s]+([A-Z0-9]+_[A-Z0-9]+(?:_[A-Z0-9]+)?)'
-    match = re.search(pattern_new1, location_str, re.IGNORECASE)
-    if match:
-        node_b = match.group(1).strip()
-        # Clean up any trailing punctuation or whitespace
-        node_b = re.sub(r'[,;\s_]+$', '', node_b)
-        return node_b
-
-    # New Pattern 2: Extract pattern like "KG_X16" from "To KG_X16 (LAG-Eth-Trunk 1)"
-    # This handles formats with parentheses immediately after node name
-    pattern_new2 = r'[Tt]o\s+([A-Z0-9]+_[A-Z0-9]+)(?:\s*\([^)]+\))?'
-    match = re.search(pattern_new2, location_str)
-    if match:
-        node_b = match.group(1).strip()
-        return node_b
-
-    # Original Pattern 1: Look for "To" or "to" followed by text until "=" or end
-    pattern1 = r'(?:To|to)\s+([^=]+?)(?=\s*=|$)'
-    match = re.search(pattern1, location_str)
-
-    if match:
-        node_b = match.group(1).strip()
-    else:
-        # Original Pattern 2: Look for "TO" in uppercase
-        pattern2 = r'TO\s+([^=]+?)(?=\s*=|$)'
-        match = re.search(pattern2, location_str)
+        # Pattern 1: Look for "To" or "to" followed by text until "=" or end
+        pattern1 = r'(?:To|to)\s+([^=]+?)(?=\s*=|$)'
+        match = re.search(pattern1, location_str)
 
         if match:
             node_b = match.group(1).strip()
         else:
-            # Original Pattern 3: If no "To" found, look for common network node patterns
-            pattern3 = r'LINK[-\s]*TO\s+([^_\s]+(?:_[^_\s]+)*)'
-            match = re.search(pattern3, location_str, re.IGNORECASE)
+            # Pattern 2: Look for "TO" in uppercase
+            pattern2 = r'TO\s+([^=]+?)(?=\s*=|$)'
+            match = re.search(pattern2, location_str)
 
             if match:
                 node_b = match.group(1).strip()
             else:
-                # Original Pattern 4: Extract anything after "---" or similar separators
-                pattern4 = r'---\s*(.+?)(?=\s*\(|$)'
-                match = re.search(pattern4, location_str)
+                # Pattern 3: If no "To" found, look for common network node patterns
+                pattern3 = r'LINK[-\s]*TO\s+([^_\s]+(?:_[^_\s]+)*)'
+                match = re.search(pattern3, location_str, re.IGNORECASE)
 
                 if match:
                     node_b = match.group(1).strip()
+                else:
+                    # Pattern 4: Extract anything after "---" or similar separators
+                    pattern4 = r'---\s*(.+?)(?=\s*\(|$)'
+                    match = re.search(pattern4, location_str)
 
-    # Clean the extracted Node B by removing text after dashes, hashes, or parentheses
-    if node_b:
-        # Remove text starting from one or more dashes (-), hashes (#), or opening parenthesis (
-        cleanup_pattern = r'[-]{1,}|[#]{1,}|\('
+                    if match:
+                        node_b = match.group(1).strip()
 
-        # Find the first occurrence of any of these patterns
-        match = re.search(cleanup_pattern, node_b)
-        if match:
-            # Keep only the text before the first match
-            node_b = node_b[:match.start()].strip()
+        # Clean the extracted Node B by removing text after dashes, hashes, or parentheses
+        if node_b:
+            # Remove text starting from one or more dashes (-), hashes (#), or opening parenthesis (
+            cleanup_pattern = r'[-]{1,}|[#]{1,}|\('
 
-        # Final cleanup: remove any trailing punctuation or whitespace
-        node_b = re.sub(r'[,;\s_]+$', '', node_b)
+            # Find the first occurrence of any of these patterns
+            match = re.search(cleanup_pattern, node_b)
+            if match:
+                # Keep only the text before the first match
+                node_b = node_b[:match.start()].strip()
 
-    return node_b
+            # Final cleanup: remove any trailing punctuation or whitespace
+            node_b = re.sub(r'[,;\s_]+$', '', node_b)
+
+        return node_b
     
     @staticmethod
     def extract_link_description(location_info):
