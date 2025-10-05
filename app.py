@@ -142,7 +142,8 @@ class ExcelProcessor:
         
         return None
     
-     @staticmethod
+ 
+    @staticmethod
 def extract_node_b(location_info):
     """Extract Node B from Location Info (text after "To" or "to" until "=" or end of string)
     Then clean by removing text after dashes, hashes, or opening parenthesis"""
