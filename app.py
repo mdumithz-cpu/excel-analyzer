@@ -1,6 +1,3 @@
-# Excel Analyzer - Web Application (Flask)
-# File: app.py
-
 from flask import Flask, render_template, request, send_file, jsonify, url_for
 import pandas as pd
 import numpy as np
@@ -12,7 +9,7 @@ import uuid
 
 app = Flask(__name__)
 app.secret_key = 'excel_analyzer_secret_key_2024'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB max file size
 
 # Ensure upload directory exists
 UPLOAD_FOLDER = 'uploads'
@@ -152,44 +149,56 @@ class ExcelProcessor:
         location_str = str(location_info)
         node_b = ""
 
-        # Pattern 1: Look for "To" or "to" followed by text until "=" or end
-        pattern1 = r'(?:To|to)\s+([^=]+?)(?=\s*=|$)'
-        match = re.search(pattern1, location_str)
+        # --- NEW PATTERN 0: Specific "LINK1_TO_" or "Link 2 To " patterns (Handles requested formats) ---
+        # Captures: 10G_LINK1_TO_GQ_X16_CEA -> GQ_X16_CEA
+        # Captures: 10G Link 2 To KG_X16 (LAG-Eth-Trunk 1) -> KG_X16
+        pattern_new_1 = r'(?:LINK\d*_TO_|Link \d* To )\s*([^_\s]+(?:_[^_\s]+)*)'
+        match = re.search(pattern_new_1, location_str, re.IGNORECASE)
 
         if match:
             node_b = match.group(1).strip()
         else:
-            # Pattern 2: Look for "TO" in uppercase
-            pattern2 = r'TO\s+([^=]+?)(?=\s*=|$)'
-            match = re.search(pattern2, location_str)
+            # --- EXISTING PATTERN 1: Look for "To" or "to" followed by text until "=" or end
+            pattern1 = r'(?:To|to)\s+([^=]+?)(?=\s*=|$)'
+            match = re.search(pattern1, location_str)
 
             if match:
                 node_b = match.group(1).strip()
             else:
-                # Pattern 3: If no "To" found, look for common network node patterns
-                pattern3 = r'LINK[-\s]*TO\s+([^_\s]+(?:_[^_\s]+)*)'
-                match = re.search(pattern3, location_str, re.IGNORECASE)
+                # --- EXISTING PATTERN 2: Look for "TO" in uppercase
+                pattern2 = r'TO\s+([^=]+?)(?=\s*=|$)'
+                match = re.search(pattern2, location_str)
 
                 if match:
                     node_b = match.group(1).strip()
                 else:
-                    # Pattern 4: Extract anything after "---" or similar separators
-                    pattern4 = r'---\s*(.+?)(?=\s*\(|$)'
-                    match = re.search(pattern4, location_str)
+                    # --- EXISTING PATTERN 3: If no "To" found, look for common network node patterns
+                    pattern3 = r'LINK[-\s]*TO\s+([^_\s]+(?:_[^_\s]+)*)'
+                    match = re.search(pattern3, location_str, re.IGNORECASE)
 
                     if match:
                         node_b = match.group(1).strip()
+                    else:
+                        # --- EXISTING PATTERN 4: Extract anything after "---" or similar separators
+                        pattern4 = r'---\s*(.+?)(?=\s*\(|$)'
+                        match = re.search(pattern4, location_str)
+
+                        if match:
+                            node_b = match.group(1).strip()
 
         # Clean the extracted Node B by removing text after dashes, hashes, or parentheses
         if node_b:
-            # Remove text starting from one or more dashes (-), hashes (#), or opening parenthesis (
-            cleanup_pattern = r'[-]{1,}|[#]{1,}|\('
+            # Remove text starting from two or more dashes (--), a hash (#), or an opening parenthesis ( at the end
+            cleanup_pattern = r'\s*[-]{2,}.*|\s*#.*|\s*\([^\)]*$'
 
             # Find the first occurrence of any of these patterns
             match = re.search(cleanup_pattern, node_b)
             if match:
                 # Keep only the text before the first match
                 node_b = node_b[:match.start()].strip()
+            
+            # Explicitly remove trailing parentheses content (necessary for example 3)
+            node_b = re.sub(r'\s*\([^\)]*$', '', node_b).strip()
 
             # Final cleanup: remove any trailing punctuation or whitespace
             node_b = re.sub(r'[,;\s_]+$', '', node_b)
@@ -386,7 +395,7 @@ class ExcelProcessor:
 
                     # Mark all but the first (oldest) for removal
                     if len(pattern_rows) > 1:
-                        rows_to_drop = pattern_rows.iloc[1:]   # Remove all but the first
+                        rows_to_drop = pattern_rows.iloc[1:]    # Remove all but the first
                         # Add indices to removal list
                         rows_to_remove.extend(rows_to_drop.index.tolist())
 
