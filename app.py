@@ -1,5 +1,6 @@
 # Excel Analyzer - Web Application (Flask)
 # File: app.py
+# Updated: Preserve highest utilization rows with latest timestamp tiebreaker
 
 from flask import Flask, render_template, request, send_file, jsonify, url_for
 import pandas as pd
@@ -98,14 +99,9 @@ class ExcelProcessor:
             rename_dict = {v: k for k, v in column_mapping.items()}
             filtered_df = filtered_df.rename(columns=rename_dict)
 
-            # Handle duplicates - keep oldest "Arrived On (ST)"
-            if all(col in filtered_df.columns for col in ['Alarm Source', 'Location Info', 'Arrived On (ST)']):
-                # Convert "Arrived On (ST)" to datetime
+            # Convert "Arrived On (ST)" to datetime for proper sorting
+            if 'Arrived On (ST)' in filtered_df.columns:
                 filtered_df['Arrived On (ST)'] = pd.to_datetime(filtered_df['Arrived On (ST)'], errors='coerce')
-
-                # Sort by datetime (oldest first) and drop duplicates keeping first occurrence
-                filtered_df = filtered_df.sort_values('Arrived On (ST)')
-                filtered_df = filtered_df.drop_duplicates(subset=['Alarm Source', 'Location Info'], keep='first')
             
             return filtered_df, None
             
@@ -282,6 +278,19 @@ class ExcelProcessor:
         return ""
     
     @staticmethod
+    def parse_utilization_value(util_string):
+        """Convert utilization string to numeric value for comparison
+        Returns float value or -1 if cannot parse"""
+        if pd.isna(util_string) or util_string == "":
+            return -1
+        
+        # Remove % sign and convert to float
+        try:
+            return float(str(util_string).replace('%', '').strip())
+        except:
+            return -1
+    
+    @staticmethod
     def create_output_table(filtered_df):
         """Create the final output table with required columns"""
         try:
@@ -325,13 +334,8 @@ class ExcelProcessor:
             output_df['Reason'] = ""
             output_df['Remarks'] = ""
 
-            # Remove duplicates based on Node A, Node B, and Link Description
-            before_final_dedup = len(output_df)
-            output_df = output_df.drop_duplicates(subset=['Node A', 'Node B', 'Link Description'], keep='first')
-            after_basic_dedup = len(output_df)
-
-            # Advanced duplicate removal for Link Description patterns starting with "S" + number
-            output_df = ExcelProcessor.remove_s_pattern_duplicates(output_df)
+            # NEW LOGIC: Remove duplicates based on highest utilization
+            output_df = ExcelProcessor.remove_duplicates_by_highest_utilization(output_df)
 
             # Group by Node A and sort within each group
             if len(output_df) > 0:
@@ -347,55 +351,46 @@ class ExcelProcessor:
             return None, str(e)
     
     @staticmethod
-    def remove_s_pattern_duplicates(output_df):
-        """Remove duplicates based on S pattern in Link Description"""
-        def extract_s_pattern(link_desc):
-            """Extract S pattern (S followed by numbers) from link description"""
-            if pd.isna(link_desc) or link_desc == "":
-                return None
-
-            # Look for pattern: S followed by one or more digits, optionally followed by underscore and more characters
-            pattern = r'S(\d+)(?:_\d+)?'
-            match = re.search(pattern, str(link_desc))
-
-            if match:
-                return match.group(0)  # Return the full match (e.g., "S1356" or "S1356_1")
-            return None
-
-        # Add a temporary column to identify S patterns
-        output_df['_temp_s_pattern'] = output_df['Link Description'].apply(extract_s_pattern)
-
-        # Find rows that have S patterns
-        s_pattern_rows = output_df[output_df['_temp_s_pattern'].notna()].copy()
-
-        if len(s_pattern_rows) > 0:
-            # Group by S pattern and count occurrences
-            s_pattern_counts = s_pattern_rows['_temp_s_pattern'].value_counts()
-            duplicate_s_patterns = s_pattern_counts[s_pattern_counts > 1].index.tolist()
-
-            if duplicate_s_patterns:
-                # For each duplicate S pattern, keep only the row with oldest timestamp
-                rows_to_remove = []
-
-                for s_pattern in duplicate_s_patterns:
-                    # Get all rows with this S pattern
-                    pattern_rows = output_df[output_df['_temp_s_pattern'] == s_pattern].copy()
-
-                    # Sort by Occurred Time (oldest first)
-                    pattern_rows = pattern_rows.sort_values('Occurred Time')
-
-                    # Mark all but the first (oldest) for removal
-                    if len(pattern_rows) > 1:
-                        rows_to_drop = pattern_rows.iloc[1:]   # Remove all but the first
-                        # Add indices to removal list
-                        rows_to_remove.extend(rows_to_drop.index.tolist())
-
-                # Remove the duplicate rows
-                if rows_to_remove:
-                    output_df = output_df.drop(rows_to_remove)
-
+    def remove_duplicates_by_highest_utilization(output_df):
+        """Remove duplicates based on Node A, Node B, and Link Description
+        Keep the row with highest utilization. If utilizations are equal, keep the latest timestamp."""
+        
+        if len(output_df) == 0:
+            return output_df
+        
+        # Add numeric utilization column for sorting
+        output_df['_temp_util_numeric'] = output_df['Utilization%'].apply(
+            ExcelProcessor.parse_utilization_value
+        )
+        
+        # Ensure Occurred Time is datetime for proper sorting
+        if 'Occurred Time' in output_df.columns:
+            output_df['Occurred Time'] = pd.to_datetime(output_df['Occurred Time'], errors='coerce')
+        
+        # Sort by:
+        # 1. Node A, Node B, Link Description (grouping)
+        # 2. Utilization (descending - highest first)
+        # 3. Occurred Time (descending - latest first)
+        output_df = output_df.sort_values(
+            by=['Node A', 'Node B', 'Link Description', '_temp_util_numeric', 'Occurred Time'],
+            ascending=[True, True, True, False, False]
+        )
+        
+        # Drop duplicates keeping first (which is now highest utilization + latest time)
+        output_df = output_df.drop_duplicates(
+            subset=['Node A', 'Node B', 'Link Description'],
+            keep='first'
+        )
+        
         # Remove temporary column
-        output_df = output_df.drop('_temp_s_pattern', axis=1)
+        output_df = output_df.drop('_temp_util_numeric', axis=1)
+        
+        return output_df
+    
+    @staticmethod
+    def remove_s_pattern_duplicates(output_df):
+        """DEPRECATED: This method is no longer used.
+        Duplicate removal is now handled by remove_duplicates_by_highest_utilization"""
         return output_df
 
 @app.route('/')
