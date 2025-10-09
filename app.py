@@ -278,6 +278,21 @@ class ExcelProcessor:
         return ""
     
     @staticmethod
+    def extract_alarm_type(name):
+        """Extract alarm type from name column (Input or Output)"""
+        if pd.isna(name):
+            return ""
+        
+        name_str = str(name).lower()
+        
+        if "input" in name_str:
+            return "Input"
+        elif "output" in name_str:
+            return "Output"
+        else:
+            return ""
+    
+    @staticmethod
     def parse_utilization_value(util_string):
         """Convert utilization string to numeric value for comparison
         Returns float value or -1 if cannot parse"""
@@ -305,6 +320,12 @@ class ExcelProcessor:
                 output_df['Occurred Time'] = filtered_df['Arrived On (ST)'].reset_index(drop=True)
             else:
                 output_df['Occurred Time'] = ""
+
+            # Alarm Type = extracted from "name" column (Input/Output)
+            if 'name' in filtered_df.columns:
+                output_df['Alarm Type'] = filtered_df['name'].apply(ExcelProcessor.extract_alarm_type).reset_index(drop=True)
+            else:
+                output_df['Alarm Type'] = ""
 
             # Node A = "Alarm Source"
             if 'Alarm Source' in filtered_df.columns:
