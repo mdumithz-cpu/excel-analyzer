@@ -528,16 +528,8 @@ def upload_file():
             # Clean up input file
             os.remove(filepath)
             
-            # Count F8 nodes by checking for [F8] marker in Node A or Node B
-            f8_count = len(output_table[
-                output_table['Node A'].str.contains(r'\[F8\]', na=False, regex=True) | 
-                output_table['Node B'].str.contains(r'\[F8\]', na=False, regex=True)
-            ])
-            
             # Build success message
             message = f'File processed successfully! {len(output_table)} rows generated.'
-            if f8_count > 0:
-                message += f' ({f8_count} rows contain F8 nodes)'
             if shift_in_date and shift_out_date:
                 message += f' Filtered from {shift_in_date} {shift_in_time} to {shift_out_date} {shift_out_time}.'
             
@@ -551,8 +543,7 @@ def upload_file():
                     'total_rows': len(output_table),
                     'node_b_count': len(output_table[output_table['Node B'] != '']),
                     'link_desc_count': len(output_table[output_table['Link Description'] != '']),
-                    'utilization_count': len(output_table[output_table['Utilization%'] != '']),
-                    'f8_count': int(f8_count)
+                    'utilization_count': len(output_table[output_table['Utilization%'] != ''])
                 }
             })
             
