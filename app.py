@@ -181,9 +181,7 @@ class ExcelProcessor:
     
     @staticmethod
     def extract_node_b(location_info):
-        """Extract Node B from Location Info (text after "To" or "to" until "=" or end of string)
-        Then clean by removing text after dashes, hashes, or opening parenthesis
-        Also detect and mark F8 patterns"""
+        """Extract Node B from Location Info"""
         if pd.isna(location_info):
             return ""
 
@@ -218,24 +216,22 @@ class ExcelProcessor:
                     if match:
                         node_b = match.group(1).strip()
 
-        # Clean the extracted Node B by removing text after dashes, hashes, or parentheses
+        # Clean the extracted Node B
         if node_b:
-            # Remove text starting from one or more dashes (-), hashes (#), or opening parenthesis (
+            # Remove text starting from dashes, hashes, or opening parenthesis
             cleanup_pattern = r'[-]{1,}|[#]{1,}|\('
-
-            # Find the first occurrence of any of these patterns
             match = re.search(cleanup_pattern, node_b)
             if match:
-                # Keep only the text before the first match
                 node_b = node_b[:match.start()].strip()
 
-            # Final cleanup: remove any trailing punctuation or whitespace
-            node_b = re.sub(r'[,;\s_]+
+            # Final cleanup: remove trailing punctuation or whitespace
+            node_b = re.sub(r'[,;\s_]+$', '', node_b)
+
+        return node_b
     
     @staticmethod
     def extract_link_description(location_info):
-        """Extract Link Description from Location Info
-        Enhanced to handle various formats including underscores and common patterns"""
+        """Extract Link Description from Location Info"""
         if pd.isna(location_info):
             return ""
 
@@ -248,38 +244,35 @@ class ExcelProcessor:
         if match:
             return match.group(1).strip()
 
-        # Pattern 2: Text between underscores (common in network descriptions)
+        # Pattern 2: Text between underscores
         pattern2 = r'_([^_]+)_'
         match = re.search(pattern2, location_str)
 
         if match:
             return match.group(1).strip()
 
-        # Pattern 3: Extract main part of link names (between first and last underscore)
+        # Pattern 3: Extract main part of link names
         if '_' in location_str:
             parts = location_str.split('_')
             if len(parts) >= 3:
-                # Take middle parts as description
                 return '_'.join(parts[1:-1])
             elif len(parts) == 2:
                 return parts[1]
 
-        # Pattern 4: Look for descriptive parts in common formats
+        # Pattern 4: Look for descriptive parts
         pattern4 = r'([A-Za-z][A-Za-z0-9_-]*[A-Za-z])'
         matches = re.findall(pattern4, location_str)
 
         if matches:
-            # Return the longest match as it's likely the description
             longest_match = max(matches, key=len)
-            if len(longest_match) > 3:  # Avoid very short matches
+            if len(longest_match) > 3:
                 return longest_match
 
         return ""
     
     @staticmethod
     def extract_utilization_percentage(other_info):
-        """Extract HIGHEST percentage value between Input and Output flow bandwidth usage
-        from Other Information column"""
+        """Extract HIGHEST percentage value between Input and Output flow bandwidth usage"""
         if pd.isna(other_info):
             return ""
         
@@ -296,10 +289,9 @@ class ExcelProcessor:
         output_matches = re.findall(output_pattern, other_str, re.IGNORECASE)
         percentages.extend([float(m) for m in output_matches])
         
-        # Return the HIGHEST percentage found between Input and Output
+        # Return the HIGHEST percentage found
         if percentages:
             max_percentage = max(percentages)
-            # Format with one decimal place if it's a float, otherwise as integer
             if max_percentage % 1 == 0:
                 return f"{int(max_percentage)}%"
             else:
@@ -311,43 +303,42 @@ class ExcelProcessor:
     def create_output_table(filtered_df):
         """Create the final output table with required columns"""
         try:
-            # Create output DataFrame
             output_df = pd.DataFrame()
 
-            # Index = record number
+            # Index
             output_df['Index'] = range(1, len(filtered_df) + 1)
 
-            # Occurred Time = "Arrived On (ST)"
+            # Occurred Time
             if 'Arrived On (ST)' in filtered_df.columns:
                 output_df['Occurred Time'] = filtered_df['Arrived On (ST)'].reset_index(drop=True)
             else:
                 output_df['Occurred Time'] = ""
 
-            # Node A = "Alarm Source"
+            # Node A
             if 'Alarm Source' in filtered_df.columns:
                 output_df['Node A'] = filtered_df['Alarm Source'].reset_index(drop=True)
             else:
                 output_df['Node A'] = ""
 
-            # Node B = text after "To" or "to" until "="
+            # Node B
             if 'Location Info' in filtered_df.columns:
                 output_df['Node B'] = filtered_df['Location Info'].apply(ExcelProcessor.extract_node_b).reset_index(drop=True)
             else:
                 output_df['Node B'] = ""
 
-            # Link Description = text between hashes
+            # Link Description
             if 'Location Info' in filtered_df.columns:
                 output_df['Link Description'] = filtered_df['Location Info'].apply(ExcelProcessor.extract_link_description).reset_index(drop=True)
             else:
                 output_df['Link Description'] = ""
 
-            # Utilization% = percentage from Other Information
+            # Utilization%
             if 'Other Information' in filtered_df.columns:
                 output_df['Utilization%'] = filtered_df['Other Information'].apply(ExcelProcessor.extract_utilization_percentage).reset_index(drop=True)
             else:
                 output_df['Utilization%'] = ""
 
-            # Add empty columns for Reason and Remarks
+            # Reason and Remarks
             output_df['Reason'] = ""
             output_df['Remarks'] = ""
 
@@ -356,28 +347,23 @@ class ExcelProcessor:
                 lambda x: float(x.replace('%', '')) if x and x != '' else 0.0
             )
 
-            # Remove duplicates based on Node A, Node B, and Link Description
-            # Keep ONLY HIGHEST utilization (no timestamp dependency)
+            # Remove duplicates - keep HIGHEST utilization only
             if len(output_df) > 0:
-                # Sort by utilization (descending only)
                 output_df = output_df.sort_values('_temp_util_numeric', ascending=False)
                 output_df = output_df.drop_duplicates(
                     subset=['Node A', 'Node B', 'Link Description'], 
                     keep='first'
                 )
 
-            # Advanced duplicate removal for Link Description patterns starting with "S" + number
+            # Remove S-pattern duplicates
             output_df = ExcelProcessor.remove_s_pattern_duplicates(output_df)
 
             # Remove temporary column
             output_df = output_df.drop('_temp_util_numeric', axis=1, errors='ignore')
 
-            # Group by Node A and sort within each group
+            # Sort by Node A and Occurred Time
             if len(output_df) > 0:
-                # Sort by Node A first, then by Occurred Time within each group
                 output_df = output_df.sort_values(['Node A', 'Occurred Time']).reset_index(drop=True)
-                
-                # Update index numbers after grouping
                 output_df['Index'] = range(1, len(output_df) + 1)
             
             return output_df, None
@@ -387,59 +373,43 @@ class ExcelProcessor:
     
     @staticmethod
     def remove_s_pattern_duplicates(output_df):
-        """Remove duplicates based on S pattern in Link Description
-        Keep row with ONLY HIGHEST utilization (no timestamp dependency)"""
+        """Remove duplicates based on S pattern in Link Description"""
         def extract_s_pattern(link_desc):
-            """Extract S pattern (S followed by numbers) from link description"""
             if pd.isna(link_desc) or link_desc == "":
                 return None
-
-            # Look for pattern: S followed by one or more digits
             pattern = r'S(\d+)(?:_\d+)?'
             match = re.search(pattern, str(link_desc))
-
             if match:
-                return match.group(0)  # Return the full match (e.g., "S1356" or "S1356_1")
+                return match.group(0)
             return None
 
-        # Add a temporary column to identify S patterns
         output_df['_temp_s_pattern'] = output_df['Link Description'].apply(extract_s_pattern)
 
-        # Create numeric utilization for comparison if not exists
         if '_temp_util_numeric' not in output_df.columns:
             output_df['_temp_util_numeric'] = output_df['Utilization%'].apply(
                 lambda x: float(x.replace('%', '')) if x and x != '' else 0.0
             )
 
-        # Find rows that have S patterns
         s_pattern_rows = output_df[output_df['_temp_s_pattern'].notna()].copy()
 
         if len(s_pattern_rows) > 0:
-            # Group by S pattern and count occurrences
             s_pattern_counts = s_pattern_rows['_temp_s_pattern'].value_counts()
             duplicate_s_patterns = s_pattern_counts[s_pattern_counts > 1].index.tolist()
 
             if duplicate_s_patterns:
-                # For each duplicate S pattern, keep only the row with highest utilization
                 rows_to_remove = []
 
                 for s_pattern in duplicate_s_patterns:
-                    # Get all rows with this S pattern
                     pattern_rows = output_df[output_df['_temp_s_pattern'] == s_pattern].copy()
-
-                    # Sort by utilization (descending only)
                     pattern_rows = pattern_rows.sort_values('_temp_util_numeric', ascending=False)
 
-                    # Mark all but the first (highest utilization) for removal
                     if len(pattern_rows) > 1:
-                        rows_to_drop = pattern_rows.iloc[1:]   # Remove all but the first
+                        rows_to_drop = pattern_rows.iloc[1:]
                         rows_to_remove.extend(rows_to_drop.index.tolist())
 
-                # Remove the duplicate rows
                 if rows_to_remove:
                     output_df = output_df.drop(rows_to_remove)
 
-        # Remove temporary column
         output_df = output_df.drop('_temp_s_pattern', axis=1, errors='ignore')
         return output_df
 
@@ -458,52 +428,41 @@ def upload_file():
     
     if file and allowed_file(file.filename):
         try:
-            # Generate unique filename
             filename = secure_filename(file.filename)
             unique_filename = f"{uuid.uuid4()}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             
-            # Save uploaded file
             file.save(filepath)
             
-            # Get filter parameters from request
             shift_in_date = request.form.get('shift_in_date', '')
             shift_in_time = request.form.get('shift_in_time', '')
             shift_out_date = request.form.get('shift_out_date', '')
             shift_out_time = request.form.get('shift_out_time', '')
             
-            # Process the Excel file
             processor = ExcelProcessor()
             
-            # Step 1: Load Excel file
             df, error = processor.load_excel_file(filepath)
             if error:
-                os.remove(filepath)  # Clean up
+                os.remove(filepath)
                 return jsonify({'success': False, 'error': f'Error loading file: {error}'})
             
-            # Step 2: Filter and process data
             filtered_data, error = processor.filter_and_process_data(df)
             if error:
-                os.remove(filepath)  # Clean up
+                os.remove(filepath)
                 return jsonify({'success': False, 'error': f'Error processing data: {error}'})
             
-            # Step 2.5: Apply date/time filtering if provided
             if shift_in_date and shift_in_time and shift_out_date and shift_out_time:
                 try:
                     shift_in_datetime = pd.to_datetime(f"{shift_in_date} {shift_in_time}")
                     shift_out_datetime = pd.to_datetime(f"{shift_out_date} {shift_out_time}")
                     
                     if 'Arrived On (ST)' in filtered_data.columns:
-                        # Ensure datetime format
                         filtered_data['Arrived On (ST)'] = pd.to_datetime(filtered_data['Arrived On (ST)'], errors='coerce')
                         
-                        # Filter by date range
-                        before_filter = len(filtered_data)
                         filtered_data = filtered_data[
                             (filtered_data['Arrived On (ST)'] >= shift_in_datetime) & 
                             (filtered_data['Arrived On (ST)'] <= shift_out_datetime)
                         ]
-                        after_filter = len(filtered_data)
                         
                         if len(filtered_data) == 0:
                             os.remove(filepath)
@@ -513,27 +472,22 @@ def upload_file():
                     os.remove(filepath)
                     return jsonify({'success': False, 'error': f'Error applying date filter: {str(e)}'})
             
-            # Step 3: Create output table
             output_table, error = processor.create_output_table(filtered_data)
             if error:
-                os.remove(filepath)  # Clean up
+                os.remove(filepath)
                 return jsonify({'success': False, 'error': f'Error creating output: {error}'})
             
-            # Step 4: Save processed file
             output_filename = f"processed_{unique_filename}"
             output_filepath = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
             
             output_table.to_excel(output_filepath, index=False)
             
-            # Clean up input file
             os.remove(filepath)
             
-            # Build success message
             message = f'File processed successfully! {len(output_table)} rows generated.'
             if shift_in_date and shift_out_date:
                 message += f' Filtered from {shift_in_date} {shift_in_time} to {shift_out_date} {shift_out_time}.'
             
-            # Return success with download link
             return jsonify({
                 'success': True, 
                 'message': message,
@@ -565,384 +519,13 @@ def download_file(filename):
 
 @app.route('/cleanup')
 def cleanup_files():
-    """Clean up old files (run periodically)"""
+    """Clean up old files"""
     try:
         current_time = datetime.now().timestamp()
         for filename in os.listdir(app.config['UPLOAD_FOLDER']):
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file_time = os.path.getctime(filepath)
             
-            # Delete files older than 1 hour
-            if current_time - file_time > 3600:
-                os.remove(filepath)
-        
-        return "Cleanup completed"
-    except Exception as e:
-        return f"Cleanup error: {str(e)}"
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-, '', node_b)
-            
-            # Check for F8 pattern and append marker if found
-            if ExcelProcessor.contains_f8(node_b):
-                node_b = f"{node_b} [F8]"
-
-        return node_b
-    
-    @staticmethod
-    def extract_link_description(location_info):
-        """Extract Link Description from Location Info
-        Enhanced to handle various formats including underscores and common patterns"""
-        if pd.isna(location_info):
-            return ""
-
-        location_str = str(location_info)
-
-        # Pattern 1: Text between # symbols
-        pattern1 = r'#([^#]+)#'
-        match = re.search(pattern1, location_str)
-
-        if match:
-            return match.group(1).strip()
-
-        # Pattern 2: Text between underscores (common in network descriptions)
-        pattern2 = r'_([^_]+)_'
-        match = re.search(pattern2, location_str)
-
-        if match:
-            return match.group(1).strip()
-
-        # Pattern 3: Extract main part of link names (between first and last underscore)
-        if '_' in location_str:
-            parts = location_str.split('_')
-            if len(parts) >= 3:
-                # Take middle parts as description
-                return '_'.join(parts[1:-1])
-            elif len(parts) == 2:
-                return parts[1]
-
-        # Pattern 4: Look for descriptive parts in common formats
-        pattern4 = r'([A-Za-z][A-Za-z0-9_-]*[A-Za-z])'
-        matches = re.findall(pattern4, location_str)
-
-        if matches:
-            # Return the longest match as it's likely the description
-            longest_match = max(matches, key=len)
-            if len(longest_match) > 3:  # Avoid very short matches
-                return longest_match
-
-        return ""
-    
-    @staticmethod
-    def extract_utilization_percentage(other_info):
-        """Extract HIGHEST percentage value between Input and Output flow bandwidth usage
-        from Other Information column"""
-        if pd.isna(other_info):
-            return ""
-        
-        other_str = str(other_info)
-        percentages = []
-        
-        # Pattern for Input flow bandwidth usage
-        input_pattern = r'Input\s+flow\s+bandwidth\s+usage\s*=\s*(\d+(?:\.\d+)?)\s*%?'
-        input_matches = re.findall(input_pattern, other_str, re.IGNORECASE)
-        percentages.extend([float(m) for m in input_matches])
-        
-        # Pattern for Output flow bandwidth usage
-        output_pattern = r'Output\s+flow\s+bandwidth\s+usage\s*=\s*(\d+(?:\.\d+)?)\s*%?'
-        output_matches = re.findall(output_pattern, other_str, re.IGNORECASE)
-        percentages.extend([float(m) for m in output_matches])
-        
-        # Return the HIGHEST percentage found between Input and Output
-        if percentages:
-            max_percentage = max(percentages)
-            # Format with one decimal place if it's a float, otherwise as integer
-            if max_percentage % 1 == 0:
-                return f"{int(max_percentage)}%"
-            else:
-                return f"{max_percentage}%"
-        
-        return ""
-    
-    @staticmethod
-    def create_output_table(filtered_df):
-        """Create the final output table with required columns"""
-        try:
-            # Create output DataFrame
-            output_df = pd.DataFrame()
-
-            # Index = record number
-            output_df['Index'] = range(1, len(filtered_df) + 1)
-
-            # Occurred Time = "Arrived On (ST)"
-            if 'Arrived On (ST)' in filtered_df.columns:
-                output_df['Occurred Time'] = filtered_df['Arrived On (ST)'].reset_index(drop=True)
-            else:
-                output_df['Occurred Time'] = ""
-
-            # Node A = "Alarm Source"
-            if 'Alarm Source' in filtered_df.columns:
-                output_df['Node A'] = filtered_df['Alarm Source'].reset_index(drop=True)
-            else:
-                output_df['Node A'] = ""
-
-            # Node B = text after "To" or "to" until "="
-            if 'Location Info' in filtered_df.columns:
-                output_df['Node B'] = filtered_df['Location Info'].apply(ExcelProcessor.extract_node_b).reset_index(drop=True)
-            else:
-                output_df['Node B'] = ""
-
-            # Link Description = text between hashes
-            if 'Location Info' in filtered_df.columns:
-                output_df['Link Description'] = filtered_df['Location Info'].apply(ExcelProcessor.extract_link_description).reset_index(drop=True)
-            else:
-                output_df['Link Description'] = ""
-
-            # Utilization% = percentage from Other Information
-            if 'Other Information' in filtered_df.columns:
-                output_df['Utilization%'] = filtered_df['Other Information'].apply(ExcelProcessor.extract_utilization_percentage).reset_index(drop=True)
-            else:
-                output_df['Utilization%'] = ""
-
-            # Add F8 Detection column
-            output_df['Contains_F8'] = output_df.apply(
-                lambda row: ExcelProcessor.contains_f8(row['Node A']) or ExcelProcessor.contains_f8(row['Node B']), 
-                axis=1
-            )
-
-            # Add empty columns for Reason and Remarks
-            output_df['Reason'] = ""
-            output_df['Remarks'] = ""
-
-            # Create numeric utilization for comparison
-            output_df['_temp_util_numeric'] = output_df['Utilization%'].apply(
-                lambda x: float(x.replace('%', '')) if x and x != '' else 0.0
-            )
-
-            # Remove duplicates based on Node A, Node B, and Link Description
-            # Keep ONLY HIGHEST utilization (no timestamp dependency)
-            if len(output_df) > 0:
-                # Sort by utilization (descending only)
-                output_df = output_df.sort_values('_temp_util_numeric', ascending=False)
-                output_df = output_df.drop_duplicates(
-                    subset=['Node A', 'Node B', 'Link Description'], 
-                    keep='first'
-                )
-
-            # Advanced duplicate removal for Link Description patterns starting with "S" + number
-            output_df = ExcelProcessor.remove_s_pattern_duplicates(output_df)
-
-            # Remove temporary column
-            output_df = output_df.drop('_temp_util_numeric', axis=1, errors='ignore')
-
-            # Group by Node A and sort within each group
-            if len(output_df) > 0:
-                # Sort by Node A first, then by Occurred Time within each group
-                output_df = output_df.sort_values(['Node A', 'Occurred Time']).reset_index(drop=True)
-                
-                # Update index numbers after grouping
-                output_df['Index'] = range(1, len(output_df) + 1)
-            
-            return output_df, None
-            
-        except Exception as e:
-            return None, str(e)
-    
-    @staticmethod
-    def remove_s_pattern_duplicates(output_df):
-        """Remove duplicates based on S pattern in Link Description
-        Keep row with ONLY HIGHEST utilization (no timestamp dependency)"""
-        def extract_s_pattern(link_desc):
-            """Extract S pattern (S followed by numbers) from link description"""
-            if pd.isna(link_desc) or link_desc == "":
-                return None
-
-            # Look for pattern: S followed by one or more digits
-            pattern = r'S(\d+)(?:_\d+)?'
-            match = re.search(pattern, str(link_desc))
-
-            if match:
-                return match.group(0)  # Return the full match (e.g., "S1356" or "S1356_1")
-            return None
-
-        # Add a temporary column to identify S patterns
-        output_df['_temp_s_pattern'] = output_df['Link Description'].apply(extract_s_pattern)
-
-        # Create numeric utilization for comparison if not exists
-        if '_temp_util_numeric' not in output_df.columns:
-            output_df['_temp_util_numeric'] = output_df['Utilization%'].apply(
-                lambda x: float(x.replace('%', '')) if x and x != '' else 0.0
-            )
-
-        # Find rows that have S patterns
-        s_pattern_rows = output_df[output_df['_temp_s_pattern'].notna()].copy()
-
-        if len(s_pattern_rows) > 0:
-            # Group by S pattern and count occurrences
-            s_pattern_counts = s_pattern_rows['_temp_s_pattern'].value_counts()
-            duplicate_s_patterns = s_pattern_counts[s_pattern_counts > 1].index.tolist()
-
-            if duplicate_s_patterns:
-                # For each duplicate S pattern, keep only the row with highest utilization
-                rows_to_remove = []
-
-                for s_pattern in duplicate_s_patterns:
-                    # Get all rows with this S pattern
-                    pattern_rows = output_df[output_df['_temp_s_pattern'] == s_pattern].copy()
-
-                    # Sort by utilization (descending only)
-                    pattern_rows = pattern_rows.sort_values('_temp_util_numeric', ascending=False)
-
-                    # Mark all but the first (highest utilization) for removal
-                    if len(pattern_rows) > 1:
-                        rows_to_drop = pattern_rows.iloc[1:]   # Remove all but the first
-                        rows_to_remove.extend(rows_to_drop.index.tolist())
-
-                # Remove the duplicate rows
-                if rows_to_remove:
-                    output_df = output_df.drop(rows_to_remove)
-
-        # Remove temporary column
-        output_df = output_df.drop('_temp_s_pattern', axis=1, errors='ignore')
-        return output_df
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'error': 'No file selected'})
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'success': False, 'error': 'No file selected'})
-    
-    if file and allowed_file(file.filename):
-        try:
-            # Generate unique filename
-            filename = secure_filename(file.filename)
-            unique_filename = f"{uuid.uuid4()}_{filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            
-            # Save uploaded file
-            file.save(filepath)
-            
-            # Get filter parameters from request
-            shift_in_date = request.form.get('shift_in_date', '')
-            shift_in_time = request.form.get('shift_in_time', '')
-            shift_out_date = request.form.get('shift_out_date', '')
-            shift_out_time = request.form.get('shift_out_time', '')
-            
-            # Process the Excel file
-            processor = ExcelProcessor()
-            
-            # Step 1: Load Excel file
-            df, error = processor.load_excel_file(filepath)
-            if error:
-                os.remove(filepath)  # Clean up
-                return jsonify({'success': False, 'error': f'Error loading file: {error}'})
-            
-            # Step 2: Filter and process data
-            filtered_data, error = processor.filter_and_process_data(df)
-            if error:
-                os.remove(filepath)  # Clean up
-                return jsonify({'success': False, 'error': f'Error processing data: {error}'})
-            
-            # Step 2.5: Apply date/time filtering if provided
-            if shift_in_date and shift_in_time and shift_out_date and shift_out_time:
-                try:
-                    shift_in_datetime = pd.to_datetime(f"{shift_in_date} {shift_in_time}")
-                    shift_out_datetime = pd.to_datetime(f"{shift_out_date} {shift_out_time}")
-                    
-                    if 'Arrived On (ST)' in filtered_data.columns:
-                        # Ensure datetime format
-                        filtered_data['Arrived On (ST)'] = pd.to_datetime(filtered_data['Arrived On (ST)'], errors='coerce')
-                        
-                        # Filter by date range
-                        before_filter = len(filtered_data)
-                        filtered_data = filtered_data[
-                            (filtered_data['Arrived On (ST)'] >= shift_in_datetime) & 
-                            (filtered_data['Arrived On (ST)'] <= shift_out_datetime)
-                        ]
-                        after_filter = len(filtered_data)
-                        
-                        if len(filtered_data) == 0:
-                            os.remove(filepath)
-                            return jsonify({'success': False, 'error': f'No alarms found between {shift_in_datetime} and {shift_out_datetime}'})
-                        
-                except Exception as e:
-                    os.remove(filepath)
-                    return jsonify({'success': False, 'error': f'Error applying date filter: {str(e)}'})
-            
-            # Step 3: Create output table
-            output_table, error = processor.create_output_table(filtered_data)
-            if error:
-                os.remove(filepath)  # Clean up
-                return jsonify({'success': False, 'error': f'Error creating output: {error}'})
-            
-            # Step 4: Save processed file
-            output_filename = f"processed_{unique_filename}"
-            output_filepath = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
-            
-            output_table.to_excel(output_filepath, index=False)
-            
-            # Clean up input file
-            os.remove(filepath)
-            
-            # Count F8 nodes
-            f8_count = output_table['Contains_F8'].sum()
-            
-            # Build success message
-            message = f'File processed successfully! {len(output_table)} rows generated.'
-            if f8_count > 0:
-                message += f' ({f8_count} rows contain F8 nodes)'
-            if shift_in_date and shift_out_date:
-                message += f' Filtered from {shift_in_date} {shift_in_time} to {shift_out_date} {shift_out_time}.'
-            
-            # Return success with download link
-            return jsonify({
-                'success': True, 
-                'message': message,
-                'download_url': url_for('download_file', filename=output_filename),
-                'filename': output_filename,
-                'stats': {
-                    'total_rows': len(output_table),
-                    'node_b_count': len(output_table[output_table['Node B'] != '']),
-                    'link_desc_count': len(output_table[output_table['Link Description'] != '']),
-                    'utilization_count': len(output_table[output_table['Utilization%'] != '']),
-                    'f8_count': int(f8_count)
-                }
-            })
-            
-        except Exception as e:
-            return jsonify({'success': False, 'error': f'Processing error: {str(e)}'})
-    
-    return jsonify({'success': False, 'error': 'Invalid file type. Please upload .xlsx or .xls files.'})
-
-@app.route('/download/<filename>')
-def download_file(filename):
-    try:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.exists(filepath):
-            return send_file(filepath, as_attachment=True, download_name=f"excel_analysis_result.xlsx")
-        else:
-            return "File not found", 404
-    except Exception as e:
-        return f"Error downloading file: {str(e)}", 500
-
-@app.route('/cleanup')
-def cleanup_files():
-    """Clean up old files (run periodically)"""
-    try:
-        current_time = datetime.now().timestamp()
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file_time = os.path.getctime(filepath)
-            
-            # Delete files older than 1 hour
             if current_time - file_time > 3600:
                 os.remove(filepath)
         
