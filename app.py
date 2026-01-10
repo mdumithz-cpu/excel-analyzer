@@ -242,43 +242,33 @@ class ExcelProcessor:
     
     @staticmethod
     def extract_utilization_percentage(other_info):
-        """Extract percentage value from Other Information column
-        Enhanced to handle various percentage formats"""
+        """Extract HIGHEST percentage value between Input and Output flow bandwidth usage
+        from Other Information column"""
         if pd.isna(other_info):
             return ""
-
+        
         other_str = str(other_info)
-
-        # Pattern 1: Standard percentage (number followed by %)
-        pattern1 = r'(\d+(?:\.\d+)?)\s*%'
-        match = re.search(pattern1, other_str)
-
-        if match:
-            return f"{match.group(1)}%"
-
-        # Pattern 2: Percentage without % symbol but with context
-        pattern2 = r'(?:utilization|usage|load)[\s:]*(\d+(?:\.\d+)?)'
-        match = re.search(pattern2, other_str, re.IGNORECASE)
-
-        if match:
-            return f"{match.group(1)}%"
-
-        # Pattern 3: Just numbers that could be percentages (0-100 range)
-        pattern3 = r'\b(\d{1,2}(?:\.\d+)?)\b'
-        matches = re.findall(pattern3, other_str)
-
-        for match in matches:
-            value = float(match)
-            if 0 <= value <= 100:
-                return f"{match}%"
-
-        # Pattern 4: Look for any decimal number and assume it's percentage
-        pattern4 = r'(\d+\.\d+)'
-        match = re.search(pattern4, other_str)
-
-        if match:
-            return f"{match.group(1)}%"
-
+        percentages = []
+        
+        # Pattern for Input flow bandwidth usage
+        input_pattern = r'Input\s+flow\s+bandwidth\s+usage\s*=\s*(\d+(?:\.\d+)?)\s*%?'
+        input_matches = re.findall(input_pattern, other_str, re.IGNORECASE)
+        percentages.extend([float(m) for m in input_matches])
+        
+        # Pattern for Output flow bandwidth usage
+        output_pattern = r'Output\s+flow\s+bandwidth\s+usage\s*=\s*(\d+(?:\.\d+)?)\s*%?'
+        output_matches = re.findall(output_pattern, other_str, re.IGNORECASE)
+        percentages.extend([float(m) for m in output_matches])
+        
+        # Return the HIGHEST percentage found between Input and Output
+        if percentages:
+            max_percentage = max(percentages)
+            # Format with one decimal place if it's a float, otherwise as integer
+            if max_percentage % 1 == 0:
+                return f"{int(max_percentage)}%"
+            else:
+                return f"{max_percentage}%"
+        
         return ""
     
     @staticmethod
