@@ -123,10 +123,12 @@ class ExcelProcessor:
                 filtered_df['_temp_util_numeric'] = 0.0
 
             # Handle duplicates - keep ONLY HIGHEST utilization (no timestamp dependency)
+            # This works across ALL alarm types including Performance Critical Alarm and Input/Output rate alarms
             if all(col in filtered_df.columns for col in ['Alarm Source', 'Location Info']):
                 # Sort by utilization (descending only)
                 filtered_df = filtered_df.sort_values('_temp_util_numeric', ascending=False)
                 # Drop duplicates keeping first occurrence (highest utilization only)
+                # This automatically handles mixed alarm types since we compare numeric utilization values
                 filtered_df = filtered_df.drop_duplicates(subset=['Alarm Source', 'Location Info'], keep='first')
             
             # Remove temporary columns
@@ -388,6 +390,9 @@ class ExcelProcessor:
             )
 
             # Remove duplicates - keep HIGHEST utilization only
+            # This works across ALL alarm types (Performance Critical Alarm, Input/Output rate alarms)
+            # For the same Node A, Node B & Link Description combination, we keep the row with max utilization
+            # regardless of whether it comes from "Indicator Value" or "Input/Output flow bandwidth usage"
             if len(output_df) > 0:
                 output_df = output_df.sort_values('_temp_util_numeric', ascending=False)
                 output_df = output_df.drop_duplicates(
