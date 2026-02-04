@@ -59,8 +59,12 @@ class ExcelProcessor:
     def filter_and_process_data(df):
         """Filter and process data according to specified criteria"""
         try:
-            # Filter rows with specific names
-            name_criteria = ["Input rate alarm notification", "Output rate alarm notification"]
+            # Filter rows with specific names - UPDATED TO INCLUDE "Performance Critical Alarm"
+            name_criteria = [
+                "Input rate alarm notification", 
+                "Output rate alarm notification",
+                "Performance Critical Alarm"
+            ]
 
             # Check if 'name' column exists (case-insensitive)
             name_col = None
@@ -102,10 +106,14 @@ class ExcelProcessor:
             if 'Arrived On (ST)' in filtered_df.columns:
                 filtered_df['Arrived On (ST)'] = pd.to_datetime(filtered_df['Arrived On (ST)'], errors='coerce')
 
-            # Extract utilization percentage for deduplication
-            if 'Other Information' in filtered_df.columns:
-                filtered_df['_temp_utilization'] = filtered_df['Other Information'].apply(
-                    ExcelProcessor.extract_utilization_percentage
+            # Extract utilization percentage for deduplication - UPDATED LOGIC
+            if 'Other Information' in filtered_df.columns and 'name' in filtered_df.columns:
+                filtered_df['_temp_utilization'] = filtered_df.apply(
+                    lambda row: ExcelProcessor.extract_utilization_percentage(
+                        row['Other Information'], 
+                        row['name']
+                    ), 
+                    axis=1
                 )
                 # Convert to numeric for comparison (remove % sign)
                 filtered_df['_temp_util_numeric'] = filtered_df['_temp_utilization'].apply(
@@ -271,12 +279,34 @@ class ExcelProcessor:
         return ""
     
     @staticmethod
-    def extract_utilization_percentage(other_info):
-        """Extract HIGHEST percentage value between Input and Output flow bandwidth usage"""
+    def extract_utilization_percentage(other_info, alarm_name=None):
+        """
+        Extract utilization percentage based on alarm type
+        
+        For "Performance Critical Alarm": Extract from "Indicator Value=xxx.xx %"
+        For other alarms: Extract HIGHEST percentage value between Input and Output flow bandwidth usage
+        """
         if pd.isna(other_info):
             return ""
         
         other_str = str(other_info)
+        
+        # Check if this is a "Performance Critical Alarm"
+        if alarm_name and "Performance Critical Alarm" in str(alarm_name):
+            # Extract from "Indicator Value=xxx.xx %"
+            indicator_pattern = r'Indicator\s+Value\s*=\s*(\d+(?:\.\d+)?)\s*%?'
+            match = re.search(indicator_pattern, other_str, re.IGNORECASE)
+            
+            if match:
+                percentage = float(match.group(1))
+                if percentage % 1 == 0:
+                    return f"{int(percentage)}%"
+                else:
+                    return f"{percentage}%"
+            
+            return ""
+        
+        # For other alarm types (Input/Output rate alarm notification)
         percentages = []
         
         # Pattern for Input flow bandwidth usage
@@ -332,9 +362,19 @@ class ExcelProcessor:
             else:
                 output_df['Link Description'] = ""
 
-            # Utilization%
-            if 'Other Information' in filtered_df.columns:
-                output_df['Utilization%'] = filtered_df['Other Information'].apply(ExcelProcessor.extract_utilization_percentage).reset_index(drop=True)
+            # Utilization% - UPDATED TO PASS ALARM NAME
+            if 'Other Information' in filtered_df.columns and 'name' in filtered_df.columns:
+                output_df['Utilization%'] = filtered_df.apply(
+                    lambda row: ExcelProcessor.extract_utilization_percentage(
+                        row['Other Information'], 
+                        row['name']
+                    ), 
+                    axis=1
+                ).reset_index(drop=True)
+            elif 'Other Information' in filtered_df.columns:
+                output_df['Utilization%'] = filtered_df['Other Information'].apply(
+                    lambda x: ExcelProcessor.extract_utilization_percentage(x)
+                ).reset_index(drop=True)
             else:
                 output_df['Utilization%'] = ""
 
