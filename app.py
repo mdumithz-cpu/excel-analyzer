@@ -309,28 +309,62 @@ class ExcelProcessor:
         return node_b
     
     @staticmethod
-    def extract_link_description(location_info):
-        """Extract Link Description from Location Info"""
+    def extract_link_description(location_info, other_info=None):
+        """Extract Link Description from Location Info or Other Information"""
         if pd.isna(location_info):
             return ""
 
         location_str = str(location_info)
 
-        # Pattern 1: Text between # symbols
-        pattern1 = r'#([^#]+)#'
+        # Special handling for Performance Critical Alarm with "Resource Name=" pattern
+        if "Resource Name=" in location_str and other_info and not pd.isna(other_info):
+            other_str = str(other_info)
+            # Try to extract from Interface Description in Other Information
+            # Pattern: Interface Description=## <LINK_DESCRIPTION> ##
+            interface_desc_pattern = r'Interface Description=##?\s*(.+?)\s*##'
+            match = re.search(interface_desc_pattern, other_str)
+            if match:
+                link_desc = match.group(1).strip()
+                return link_desc
+            
+            # Alternative pattern without closing ##
+            interface_desc_pattern2 = r'Interface Description=##?\s*(.+?)(?:\s*$|,)'
+            match = re.search(interface_desc_pattern2, other_str)
+            if match:
+                link_desc = match.group(1).strip()
+                return link_desc
+
+        # Pattern 1: Text between --- separators (e.g., "--- 10G Link To CEA_Matara_X16 ---")
+        pattern1 = r'---\s*(.+?)\s*---'
         match = re.search(pattern1, location_str)
-
         if match:
-            return match.group(1).strip()
+            link_desc = match.group(1).strip()
+            return link_desc
 
-        # Pattern 2: Text between underscores
-        pattern2 = r'_([^_]+)_'
+        # Pattern 2: Text between # symbols
+        pattern2 = r'#([^#]+)#'
         match = re.search(pattern2, location_str)
-
         if match:
             return match.group(1).strip()
 
-        # Pattern 3: Extract main part of link names
+        # Pattern 3: Text in "If Alias=" field (extract everything after "If Alias=" until "If Memo" or end)
+        pattern3 = r'If Alias=(.+?)(?:\s+If Memo|$)'
+        match = re.search(pattern3, location_str)
+        if match:
+            alias_content = match.group(1).strip()
+            # Clean up the content
+            alias_content = alias_content.replace('description', '').strip()
+            alias_content = alias_content.replace('##', '').strip()
+            if alias_content and len(alias_content) > 3:
+                return alias_content
+
+        # Pattern 4: Text between underscores
+        pattern4 = r'_([^_]+)_'
+        match = re.search(pattern4, location_str)
+        if match:
+            return match.group(1).strip()
+
+        # Pattern 5: Extract main part of link names
         if '_' in location_str:
             parts = location_str.split('_')
             if len(parts) >= 3:
@@ -338,9 +372,9 @@ class ExcelProcessor:
             elif len(parts) == 2:
                 return parts[1]
 
-        # Pattern 4: Look for descriptive parts
-        pattern4 = r'([A-Za-z][A-Za-z0-9_-]*[A-Za-z])'
-        matches = re.findall(pattern4, location_str)
+        # Pattern 6: Look for descriptive parts
+        pattern6 = r'([A-Za-z][A-Za-z0-9_-]*[A-Za-z])'
+        matches = re.findall(pattern6, location_str)
 
         if matches:
             longest_match = max(matches, key=len)
@@ -435,9 +469,17 @@ class ExcelProcessor:
             else:
                 output_df['Node B'] = ""
 
-            # Link Description
+            # Link Description - NOW PASSES OTHER INFORMATION FOR PERFORMANCE CRITICAL ALARMS
             if 'Location Info' in filtered_df.columns:
-                output_df['Link Description'] = filtered_df['Location Info'].apply(ExcelProcessor.extract_link_description).reset_index(drop=True)
+                if 'Other Information' in filtered_df.columns:
+                    output_df['Link Description'] = filtered_df.apply(
+                        lambda row: ExcelProcessor.extract_link_description(row['Location Info'], row['Other Information']),
+                        axis=1
+                    ).reset_index(drop=True)
+                else:
+                    output_df['Link Description'] = filtered_df['Location Info'].apply(
+                        lambda x: ExcelProcessor.extract_link_description(x)
+                    ).reset_index(drop=True)
             else:
                 output_df['Link Description'] = ""
 
