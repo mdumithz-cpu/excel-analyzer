@@ -82,6 +82,39 @@ class ExcelProcessor:
             if len(filtered_df) == 0:
                 return None, "No rows match the name criteria!"
 
+            # Additional filtering: Remove "Performance Critical Alarm" with low utilization
+            # These are alerts for bandwidth being TOO LOW, not high utilization
+            if 'Other Information' in filtered_df.columns and 'Location Info' in filtered_df.columns:
+                # Keep only rows that are NOT (Performance Critical Alarm AND low utilization)
+                def should_keep_row(row):
+                    if row[name_col] == "Performance Critical Alarm":
+                        location_info = str(row['Location Info']) if pd.notna(row['Location Info']) else ""
+                        other_info = str(row['Other Information']) if pd.notna(row['Other Information']) else ""
+                        
+                        # Check if it's a "Low" threshold type in Location Info
+                        if "Threshold Type=Low" in location_info:
+                            return False  # Exclude low threshold alarms
+                        
+                        # Check if Indicator Value is significantly lower than Threshold
+                        # Extract Threshold and Indicator Value
+                        threshold_match = re.search(r'Threshold=(\d+(?:\.\d+)?)\s*%', other_info)
+                        indicator_match = re.search(r'Indicator Value=(\d+(?:\.\d+)?)\s*%', other_info)
+                        
+                        if threshold_match and indicator_match:
+                            threshold = float(threshold_match.group(1))
+                            indicator_value = float(indicator_match.group(1))
+                            
+                            # If indicator is less than threshold, it's a low utilization alarm
+                            if indicator_value < threshold:
+                                return False  # Exclude low utilization alarms
+                    
+                    return True  # Keep all other rows
+                
+                filtered_df = filtered_df[filtered_df.apply(should_keep_row, axis=1)].copy()
+                
+                if len(filtered_df) == 0:
+                    return None, "No rows remaining after filtering out low threshold alarms!"
+
             # Select required columns (case-insensitive matching)
             required_columns = ["name", "Alarm Source", "Location Info", "Arrived On (ST)", "Other Information"]
             column_mapping = {}
@@ -190,52 +223,88 @@ class ExcelProcessor:
         return False
     
     @staticmethod
-    def extract_node_b(location_info):
-        """Extract Node B from Location Info"""
+    def extract_node_b(location_info, other_info=None):
+        """Extract Node B from Location Info or Other Information"""
         if pd.isna(location_info):
             return ""
 
         location_str = str(location_info)
         node_b = ""
 
-        # Pattern 1: Look for "To" or "to" followed by text until "=" or end
-        pattern1 = r'(?:To|to)\s+([^=]+?)(?=\s*=|$)'
-        match = re.search(pattern1, location_str)
-
-        if match:
-            node_b = match.group(1).strip()
-        else:
-            # Pattern 2: Look for "TO" in uppercase
-            pattern2 = r'TO\s+([^=]+?)(?=\s*=|$)'
-            match = re.search(pattern2, location_str)
-
+        # Special handling for Performance Critical Alarm with "Resource Name=" pattern
+        if "Resource Name=" in location_str and other_info and not pd.isna(other_info):
+            other_str = str(other_info)
+            # Try to extract from Interface Description in Other Information
+            # Pattern: Interface Description=## ... TO <NODE_B> ...
+            interface_desc_pattern = r'Interface Description=##?\s*.*?\s+TO\s+([A-Za-z0-9_]+)'
+            match = re.search(interface_desc_pattern, other_str, re.IGNORECASE)
             if match:
                 node_b = match.group(1).strip()
-            else:
-                # Pattern 3: If no "To" found, look for common network node patterns
-                pattern3 = r'LINK[-\s]*TO\s+([^_\s]+(?:_[^_\s]+)*)'
-                match = re.search(pattern3, location_str, re.IGNORECASE)
+                # Clean up any trailing text after node name
+                node_b = re.sub(r'\s*\(.*', '', node_b)
+                node_b = re.sub(r'\s*##.*', '', node_b)
+                return node_b
 
-                if match:
-                    node_b = match.group(1).strip()
-                else:
-                    # Pattern 4: Extract anything after "---" or similar separators
-                    pattern4 = r'---\s*(.+?)(?=\s*\(|$)'
-                    match = re.search(pattern4, location_str)
+        # Pattern 1: Look for "_To_" or "_TO_" in Link Description (e.g., 10G_Link1_To_BD_X16A_CEA)
+        pattern1 = r'_[Tt][Oo]_([A-Za-z0-9_]+)'
+        match = re.search(pattern1, location_str)
+        if match:
+            node_b = match.group(1).strip()
+            # Remove any trailing ## or other symbols
+            node_b = re.sub(r'\s*##.*', '', node_b)
+            return node_b
 
-                    if match:
-                        node_b = match.group(1).strip()
+        # Pattern 2: Look for "To " or "to " followed by text until "=" or end
+        pattern2 = r'[Tt]o\s+([A-Za-z0-9_]+)'
+        match = re.search(pattern2, location_str)
+        if match:
+            node_b = match.group(1).strip()
+            # Clean up any trailing text
+            node_b = re.sub(r'\s*##.*', '', node_b)
+            node_b = re.sub(r'\s*\(.*', '', node_b)
+            return node_b
 
-        # Clean the extracted Node B
-        if node_b:
-            # Remove text starting from dashes, hashes, or opening parenthesis
-            cleanup_pattern = r'[-]{1,}|[#]{1,}|\('
-            match = re.search(cleanup_pattern, node_b)
-            if match:
-                node_b = node_b[:match.start()].strip()
+        # Pattern 3: Look for "TO " in uppercase
+        pattern3 = r'TO\s+([A-Za-z0-9_]+)'
+        match = re.search(pattern3, location_str)
+        if match:
+            node_b = match.group(1).strip()
+            node_b = re.sub(r'\s*##.*', '', node_b)
+            node_b = re.sub(r'\s*\(.*', '', node_b)
+            return node_b
 
-            # Final cleanup: remove trailing punctuation or whitespace
-            node_b = re.sub(r'[,;\s_]+$', '', node_b)
+        # Pattern 4: Look for common network node patterns with LINK-TO
+        pattern4 = r'LINK[-\s]*TO\s+([A-Za-z0-9_]+)'
+        match = re.search(pattern4, location_str, re.IGNORECASE)
+        if match:
+            node_b = match.group(1).strip()
+            node_b = re.sub(r'\s*##.*', '', node_b)
+            node_b = re.sub(r'\s*\(.*', '', node_b)
+            return node_b
+
+        # Pattern 5: Extract anything after "---" separator
+        pattern5 = r'---\s*([A-Za-z0-9_]+)'
+        match = re.search(pattern5, location_str)
+        if match:
+            node_b = match.group(1).strip()
+            node_b = re.sub(r'\s*##.*', '', node_b)
+            node_b = re.sub(r'\s*\(.*', '', node_b)
+            return node_b
+
+        # Pattern 6: Look for node name at the end (e.g., "100G LINK-2 WE_NE40_CORE")
+        # This pattern looks for uppercase node names at the end
+        pattern6 = r'\s([A-Z][A-Z0-9_]*(?:_[A-Z0-9]+)+)\s*##?'
+        match = re.search(pattern6, location_str)
+        if match:
+            node_b = match.group(1).strip()
+            return node_b
+
+        # Pattern 7: Last resort - look for node name pattern at end without ##
+        pattern7 = r'\s([A-Z][A-Z0-9_]*(?:_[A-Z0-9]+)+)\s*$'
+        match = re.search(pattern7, location_str)
+        if match:
+            node_b = match.group(1).strip()
+            return node_b
 
         return node_b
     
@@ -352,9 +421,17 @@ class ExcelProcessor:
             else:
                 output_df['Node A'] = ""
 
-            # Node B
+            # Node B - NOW PASSES OTHER INFORMATION FOR PERFORMANCE CRITICAL ALARMS
             if 'Location Info' in filtered_df.columns:
-                output_df['Node B'] = filtered_df['Location Info'].apply(ExcelProcessor.extract_node_b).reset_index(drop=True)
+                if 'Other Information' in filtered_df.columns:
+                    output_df['Node B'] = filtered_df.apply(
+                        lambda row: ExcelProcessor.extract_node_b(row['Location Info'], row['Other Information']),
+                        axis=1
+                    ).reset_index(drop=True)
+                else:
+                    output_df['Node B'] = filtered_df['Location Info'].apply(
+                        lambda x: ExcelProcessor.extract_node_b(x)
+                    ).reset_index(drop=True)
             else:
                 output_df['Node B'] = ""
 
